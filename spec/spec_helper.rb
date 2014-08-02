@@ -1,5 +1,7 @@
 # encoding: utf-8
 
+require 'powerpack/string/strip_margin'
+
 if ENV['TRAVIS'] && RUBY_ENGINE == 'jruby'
   # Force JRuby not to select working directory
   # as temporary directory on Travis CI.
@@ -145,6 +147,40 @@ module RuboCop
         offenses.sort.map { |o| o.location.source }
       end
     end
+  end
+end
+
+def registers_offense(src)
+  src_lines = []
+  highlights = []
+  special_strip(src).lines.to_a.each do |line|
+    if line =~ /^( *)(\^+)$/
+      highlights << src_lines.last[Regexp.last_match[1].length,
+                                   Regexp.last_match[2].length]
+    else
+      src_lines << line
+    end
+  end
+  inspect_source(cop, src_lines)
+  expect(cop.highlights).to eq(highlights)
+end
+
+def registers_no_offense(src)
+  inspect_source(cop, special_strip(src))
+  expect(cop.highlights).to be_empty
+end
+
+def autocorrects(options)
+  corrected = autocorrect_source(cop, special_strip(options[:from]))
+  expect(corrected).to eq(special_strip(options[:to]))
+end
+
+def special_strip(src)
+  case src
+  when /^\|[^\n]*\n( *)\|/
+    ("\n" + Regexp.last_match[1] + src).strip_margin('|')
+  else
+    src
   end
 end
 
