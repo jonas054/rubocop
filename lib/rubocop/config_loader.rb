@@ -66,7 +66,12 @@ module RuboCop
           end
 
           print 'Inheriting ' if debug?
-          load_file(f)
+          if f.end_with?('.rb')
+            load(f) # The file shall define ConfigLoader.config_from_user_code
+            config_from_user_code
+          else
+            load_file(f)
+          end
         end
 
         configs.compact
