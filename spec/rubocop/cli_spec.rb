@@ -584,8 +584,6 @@ describe RuboCop::CLI, :isolated_environment do
         expect($stdout.string)
           .to eq(["#{abs('example.rb')}:2:1: C: [Corrected] Use hash " \
                   'literal `{}` instead of `Hash.new`.',
-                  "#{abs('example.rb')}:2:9: C: [Corrected] Do not use " \
-                  'parentheses for method calls with no arguments.',
                   ''].join("\n"))
       end
 

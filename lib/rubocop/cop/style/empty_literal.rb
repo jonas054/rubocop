@@ -43,21 +43,20 @@ module RuboCop
         end
 
         def autocorrect(node)
-          name = case node
-                 when ARRAY_NODE
-                   '[]'
-                 when HASH_NODE
-                   # `some_method {}` is not same as `some_method Hash.new`
-                   # because the braces are interpreted as a block, so we avoid
-                   # the correction. Parentheses around the arguments would
-                   # solve the problem, but we let the user add those manually.
-                   if first_arg_in_method_call_without_parentheses?(node)
-                     fail CorrectionNotPossible
-                   end
-                   '{}'
-                 when STR_NODE
-                   "''"
-                 end
+          name =
+            case node
+            when ARRAY_NODE
+              '[]'
+            when HASH_NODE
+              # `some_method {}` is not same as `some_method Hash.new`
+              # because the braces are interpreted as a block, so we avoid
+              # the correction. Parentheses around the arguments would
+              # solve the problem, but we let the user add those manually.
+              return nil if first_arg_in_method_call_without_parentheses?(node)
+              '{}'
+            when STR_NODE
+              "''"
+            end
           @corrections << lambda do |corrector|
             corrector.replace(node.loc.expression, name)
           end
