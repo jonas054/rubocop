@@ -2,6 +2,8 @@
 
 ## master (unreleased)
 
+## 0.32.0 (06/06/2015)
+
 ### New features
 
 * [#1719](https://github.com/bbatsov/rubocop/pull/1719): Display an error and abort the program if input file can't be found. ([@matugm][])
