@@ -167,6 +167,16 @@ describe RuboCop::Cop::Lint::FormatParameterMismatch do
     expect(cop.offenses.size).to eq(1)
   end
 
+  it 'does not register an offense for sprintf with splat argument' do
+    inspect_source(cop, 'sprintf("%d%d", *test)')
+    expect(cop.offenses).to be_empty
+  end
+
+  it 'does not register an offense for format with splat argument' do
+    inspect_source(cop, 'format("%d%d", *test)')
+    expect(cop.offenses).to be_empty
+  end
+
   it 'finds the correct number of fields' do
     expect(''.scan(described_class::FIELD_REGEX).size)
       .to eq(0)
