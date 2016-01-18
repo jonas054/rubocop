@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # This module provides approximate string matching methods.
@@ -20,9 +21,11 @@ module RuboCop
 
       def initialize(a, b)
         if a.size < b.size
-          @shorter, @longer = a, b
+          @shorter = a
+          @longer = b
         else
-          @shorter, @longer = b, a
+          @shorter = b
+          @longer = a
         end
       end
 

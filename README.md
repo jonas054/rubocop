@@ -1,13 +1,12 @@
 [![Gem Version](https://badge.fury.io/rb/rubocop.svg)](http://badge.fury.io/rb/rubocop)
 [![Dependency Status](https://gemnasium.com/bbatsov/rubocop.svg)](https://gemnasium.com/bbatsov/rubocop)
 [![Build Status](https://travis-ci.org/bbatsov/rubocop.svg?branch=master)](https://travis-ci.org/bbatsov/rubocop)
-[![Coverage Status](http://img.shields.io/coveralls/bbatsov/rubocop/master.svg)](https://coveralls.io/r/bbatsov/rubocop)
+[![Coverage Status](https://img.shields.io/codeclimate/coverage/github/bbatsov/rubocop.svg)](https://codeclimate.com/github/bbatsov/rubocop)
 [![Code Climate](https://codeclimate.com/github/bbatsov/rubocop/badges/gpa.svg)](https://codeclimate.com/github/bbatsov/rubocop)
 [![Inline docs](http://inch-ci.org/github/bbatsov/rubocop.svg)](http://inch-ci.org/github/bbatsov/rubocop)
-[![Gratipay](http://img.shields.io/gratipay/bbatsov.svg)](https://www.gratipay.com/bbatsov/)
 
 <p align="center">
-  <img src="https://raw.github.com/bbatsov/rubocop/master/logo/rubo-logo-horizontal.png" alt="RuboCop Logo"/>
+  <img src="https://raw.githubusercontent.com/bbatsov/rubocop/master/logo/rubo-logo-horizontal.png" alt="RuboCop Logo"/>
 </p>
 
 > Role models are important. <br/>
@@ -23,15 +22,19 @@ Most aspects of its behavior can be tweaked via various
 Apart from reporting problems in your code, RuboCop can also
 automatically fix some of the problems for you.
 
-You can support my work on RuboCop and [all my other projects](https://github.com/bbatsov) via [gratipay](https://www.gratipay.com/bbatsov).
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/bbatsov/rubocop?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
-[![Support via Gratipay](https://cdn.rawgit.com/gratipay/gratipay-badge/2.1.3/dist/gratipay.png)](https://gratipay.com/bbatsov)
+You can support my work on RuboCop via
+[Salt](https://salt.bountysource.com/teams/rubocop) and
+[Gratipay](https://gratipay.com/rubocop/).
+
+[![Support via Gratipay](https://cdn.rawgit.com/gratipay/gratipay-badge/2.1.3/dist/gratipay.png)](https://gratipay.com/rubocop/)
 
 **This documentation tracks the `master` branch of RuboCop. Some of
 the features and settings discussed here might not be available in
 older releases (including the current stable release). Please, consult
-the relevant git repo branch if you need documentation for a specific RuboCop
-release.**
+the relevant git tag (e.g. v0.30.0) if you need documentation for a
+specific RuboCop release.**
 
 - [Installation](#installation)
 - [Basic Usage](#basic-usage)
@@ -44,6 +47,8 @@ release.**
     - [Inheritance](#inheritance)
     - [Defaults](#defaults)
     - [Including/Excluding files](#includingexcluding-files)
+    - [Generic configuration parameters](#generic-configuration-parameters)
+    - [Setting the target Ruby version](#setting-the-target-ruby-version)
     - [Automatically Generated Configuration](#automatically-generated-configuration)
 - [Disabling Cops within Source Code](#disabling-cops-within-source-code)
 - [Formatters](#formatters)
@@ -55,6 +60,7 @@ release.**
     - [File List Formatter](#file-list-formatter)
     - [JSON Formatter](#json-formatter)
     - [Offense Count Formatter](#offense-count-formatter)
+    - [HTML Formatter](#html-formatter)
 - [Compatibility](#compatibility)
 - [Editor integration](#editor-integration)
     - [Emacs](#emacs)
@@ -64,9 +70,17 @@ release.**
     - [TextMate2](#textmate2)
     - [Atom](#atom)
     - [LightTable](#lighttable)
+    - [RubyMine](#rubymine)
     - [Other Editors](#other-editors)
+- [Git pre-commit hook integration](#git-pre-commit-hook-integration)
 - [Guard integration](#guard-integration)
 - [Rake integration](#rake-integration)
+- [Exit codes](#exit-codes)
+- [Caching](#caching)
+    - [Cache Validity](#cache-validity)
+    - [Enabling and Disabling the Cache](#enabling-and-disabling-the-cache)
+    - [Cache Path](#cache-path)
+    - [Cache Pruning](#cache-pruning)
 - [Extensions](#extensions)
   - [Loading Extensions](#loading-extensions)
   - [Custom Cops](#custom-cops)
@@ -85,13 +99,13 @@ release.**
 
 **RuboCop**'s installation is pretty standard:
 
-```
+```sh
 $ gem install rubocop
 ```
 
 If you'd rather install RuboCop using `bundler`, don't require it in your `Gemfile`:
 
-```
+```rb
 gem 'rubocop', require: false
 ```
 
@@ -100,13 +114,13 @@ gem 'rubocop', require: false
 Running `rubocop` with no arguments will check all Ruby source files
 in the current directory:
 
-```
+```sh
 $ rubocop
 ```
 
 Alternatively you can pass `rubocop` a list of files and directories to check:
 
-```
+```sh
 $ rubocop app spec lib/something.rb
 ```
 
@@ -123,45 +137,58 @@ end
 Running RuboCop on it (assuming it's in a file named `test.rb`) would produce the following report:
 
 ```
+Inspecting 1 file
+W
+
 Offenses:
 
-test.rb:1:5: C: Use snake_case for methods and variables.
+test.rb:1:5: C: Use snake_case for method names.
 def badName
     ^^^^^^^
-test.rb:2:3: C: Favor modifier if/unless usage when you have a single-line body. Another good alternative is the usage of control flow &&/||.
+test.rb:2:3: C: Use a guard clause instead of wrapping the code inside a conditional expression.
+  if something
+  ^^
+test.rb:2:3: C: Favor modifier if usage when having a single-line body. Another good alternative is the usage of control flow &&/||.
   if something
   ^^
 test.rb:4:5: W: end at 4, 4 is not aligned with if at 2, 2
     end
     ^^^
 
-1 file inspected, 3 offenses detected
+1 file inspected, 4 offenses detected
 ```
 
 For more details check the available command-line options:
 
-```
+```sh
 $ rubocop -h
 ```
 
 Command flag              | Description
 --------------------------|------------------------------------------------------------
-`-v/--version`            | Displays the current version and exits
-`-V/--verbose-version`    | Displays the current version plus the version of Parser and Ruby
-`-F/--fail-fast`          | Inspects in modification time order and stops after first file with offenses
-`-d/--debug`              | Displays some extra debug output
+`-v/--version`            | Displays the current version and exits.
+`-V/--verbose-version`    | Displays the current version plus the version of Parser and Ruby.
+`-L/--list-target-files`  | List all files RuboCop will inspect.
+`-F/--fail-fast`          | Inspects in modification time order and stops after first file with offenses.
+`-C/--cache`              | Store and reuse results for faster operation.
+`-d/--debug`              | Displays some extra debug output.
 `-D/--display-cop-names`  | Displays cop names in offense messages.
-`-c/--config`             | Run with specified config file
-`-f/--format`             | Choose a formatter
-`-o/--out`                | Write output to a file instead of STDOUT
-`-r/--require`            | Require Ruby file (see [Loading Extensions](#loading-extensions))
-`-R/--rails`              | Run extra Rails cops
-`-l/--lint`               | Run only lint cops
-`-a/--auto-correct`       | Auto-correct certain offenses *Note:* Experimental - use with caution
-`--only`                  | Run only the specified cop(s)
-`--auto-gen-config`       | Generate a configuration file acting as a TODO list
-`--show-cops`             | Shows available cops and their configuration
-`--fail-level`            | Minimum severity for exit with error code
+`-E/--extra-details`      | Displays extra details in offense messages.
+`-c/--config`             | Run with specified config file.
+`-f/--format`             | Choose a formatter.
+`-o/--out`                | Write output to a file instead of STDOUT.
+`-r/--require`            | Require Ruby file (see [Loading Extensions](#loading-extensions)).
+`-R/--rails`              | Run extra Rails cops.
+`-l/--lint`               | Run only lint cops.
+`-a/--auto-correct`       | Auto-correct certain offenses. *Note:* Experimental - use with caution.
+`--only`                  | Run only the specified cop(s) and/or cops in the specified departments.
+`--except`                | Run all cops enabled by configuration except the specified cop(s) and/or departments.
+`--auto-gen-config`       | Generate a configuration file acting as a TODO list.
+`--no-offense-counts`     | Don't show offense counts in config file generated by --auto-gen-config
+`--exclude-limit`         | Limit how many individual files `--auto-gen-config` can list in `Exclude` parameters, default is 15.
+`--show-cops`             | Shows available cops and their configuration.
+`--fail-level`            | Minimum [severity](#severity) for exit with error code. Full severity name or upper case initial can be given. Normally, auto-corrected offenses are ignored. Use `A` or `autocorrect` if you'd like them to trigger failure.
+`-s/--stdin`              | Pipe source from STDIN. This is useful for editor integration.
 
 ### Cops
 
@@ -172,7 +199,7 @@ You can also load [custom cops](#custom-cops).
 #### Style
 
 Most of the cops in RuboCop are so called style cops that check for
-stylistics problems in your code. Almost all of the them are based on
+stylistic problems in your code. Almost all of the them are based on
 the Ruby Style Guide. Many of the style cops have configurations
 options allowing them to support different popular coding
 conventions.
@@ -184,7 +211,7 @@ code. RuboCop implements in a portable way all built-in MRI lint
 checks (`ruby -wc`) and adds a lot of extra lint checks of its
 own. You can run only the lint cops like this:
 
-```
+```sh
 $ rubocop -l
 ```
 
@@ -201,21 +228,26 @@ configuration parameter called `Max` and when running
 `rubocop --auto-gen-config`, this parameter will be set to the highest value
 found for the inspected code.
 
+#### Performance
+
+Performance cops catch Ruby idioms which are known to be slower than another
+equivalent (and equally readable) idiom.
+
 #### Rails
 
 Rails cops are specific to the Ruby on Rails framework. Unlike style
 and lint cops they are not used by default and you have to request them
 specifically:
 
-```
+```sh
 $ rubocop -R
 ```
 
 or add the following directive to your `.rubocop.yml`:
 
 ```yaml
-AllCops:
-  RunRailsCops: true
+Rails:
+  Enabled: true
 ```
 
 ## Configuration
@@ -246,6 +278,11 @@ Metrics/LineLength:
 
 ### Inheritance
 
+RuboCop supports inheriting configuration from one or more supplemental
+configuration files at runtime.
+
+#### Inheriting from another configuration file in the project
+
 The optional `inherit_from` directive is used to include configuration
 from one or more files. This makes it possible to have the common
 project settings in the `.rubocop.yml` file at the project root, and
@@ -261,6 +298,62 @@ inheritance is:
 inherit_from:
   - ../.rubocop.yml
   - ../conf/.rubocop.yml
+```
+
+### Inheriting configuration from a remote URL
+
+The optional `inherit_from` directive can contain a full url to a remote
+file. This makes it possible to have common project settings stored on a http
+server and shared between many projects.
+
+The remote config file is cached locally and is only updated if:
+
+- The file does not exist.
+- The file has not been updated in the last 24 hours.
+- The remote copy has a newer modification time than the local copy.
+
+You can inherit from both remote and local files in the same config and the
+same inheritance rules apply to remote URLs and inheriting from local
+files where the first file in the list has the lowest precedence and the
+last one has the highest. The format for multiple inheritance using URLs is:
+
+```yaml
+inherit_from:
+  - http://www.example.com/rubocop.yml
+  - ../.rubocop.yml
+```
+
+#### Inheriting configuration from a dependency gem
+
+The optional `inherit_gem` directive is used to include configuration from
+one or more gems external to the current project. This makes it possible to
+inherit a shared dependency's RuboCop configuration that can be used from
+multiple disparate projects.
+
+Configurations inherited in this way will be essentially *prepended* to the
+`inherit_from` directive, such that the `inherit_gem` configurations will be
+loaded first, then the `inherit_from` relative file paths will be loaded
+(overriding the configurations from the gems), and finally the remaining
+directives in the configuration file will supersede any of the inherited
+configurations. This means the configurations inherited from one or more gems
+have the lowest precedence of inheritance.
+
+The directive should be formatted as a YAML Hash using the gem name as the
+key and the relative path within the gem as the value:
+
+```yaml
+inherit_gem:
+  my-shared-gem: .rubocop.yml
+  cucumber: conf/rubocop.yml
+```
+
+**Note**: If the shared dependency is declared using a [Bundler](http://bundler.io/)
+Gemfile and the gem was installed using `bundle install`, it would be
+necessary to also invoke RuboCop using Bundler in order to find the
+dependency's installation path at runtime:
+
+```
+$ bundle exec rubocop <options...>
 ```
 
 ### Defaults
@@ -326,7 +419,7 @@ paths match `app/models/*.rb`). All cops support the
 `Include` param.
 
 ```yaml
-Rails/DefaultScope:
+Rails/HasAndBelongsToMany:
   Include:
     - app/models/*.rb
 ```
@@ -336,10 +429,17 @@ instance you might want to run some cop only on a specific file). All cops suppo
 `Exclude` param.
 
 ```yaml
-Rails/DefaultScope:
+Rails/HasAndBelongsToMany:
   Exclude:
     - app/models/problematic.rb
 ```
+
+### Generic configuration parameters
+
+In addition to `Include` and `Exclude`, the following parameters are available
+for every cop.
+
+#### Enabled
 
 Specific cops can be disabled by setting `Enabled` to `false` for that specific cop.
 
@@ -348,12 +448,68 @@ Metrics/LineLength:
   Enabled: false
 ```
 
-Cops can customize their severity level. All cops support the `Severity` param.
-Allowed params are `refactor`, `convention`, `warning`, `error` and `fatal`.
+Most cops are enabled by default. Some cops, configured in [config/disabled.yml](https://github.com/bbatsov/rubocop/blob/master/config/disabled.yml), are disabled by default. The cop enabling process can be altered by setting `DisabledByDefault` to `true`.
+
+```yaml
+AllCops:
+  DisabledByDefault: true
+```
+
+All cops are then disabled by default, and only cops appearing in user configuration files are enabled. `Enabled: true` does not have to be set for cops in user configuration. They will be enabled anyway.
+
+#### Severity
+
+Each cop has a default severity level based on which department it belongs
+to. The level is `warning` for `Lint` and `convention` for all the others.
+Cops can customize their severity level. Allowed params are `refactor`,
+`convention`, `warning`, `error` and `fatal`.
+
+There is one exception from the general rule above and that is `Lint/Syntax`, a
+special cop that checks for syntax errors before the other cops are invoked. It
+can not be disabled and its severity (`fatal`) can not be changed in
+configuration.
 
 ```yaml
 Metrics/CyclomaticComplexity:
   Severity: warning
+```
+
+#### Details
+
+Individual cops can be embellished with extra details in offense messages:
+
+```yaml
+Metrics/LineLength:
+  Details: >-
+    If lines are too short, text becomes hard to read because you must
+    constantly jump from one line to the next while reading. If lines are too
+    long, the line jumping becomes too hard because you "lose the line" while
+    going back to the start of the next line.  80 characters is a good
+    compromise.
+```
+
+#### AutoCorrect
+
+Cops that support the `--auto-correct` option can have that support
+disabled. For example:
+
+```yaml
+Style/PerlBackrefs:
+  AutoCorrect: false
+```
+
+### Setting the target Ruby version
+
+Some checks are dependent on the version of the Ruby interpreter which the
+inspected code must run on. For example, using Ruby 2.0+ keyword arguments
+rather than an options hash can help make your code shorter and more
+expressive... _unless_ it must run on Ruby 1.9.
+
+Let RuboCop know the oldest version of Ruby which your project supports with:
+
+```yaml
+AllCops:
+  TargetRubyVersion: 1.9
 ```
 
 ### Automatically Generated Configuration
@@ -361,10 +517,18 @@ Metrics/CyclomaticComplexity:
 If you have a code base with an overwhelming amount of offenses, it can
 be a good idea to use `rubocop --auto-gen-config` and add an
 `inherit_from: .rubocop_todo.yml` in your `.rubocop.yml`. The generated
-file `.rubocop_todo.yml` contains configuration to disable all cops that
-currently detect an offense in the code. Then you can start removing the
-entries in the generated file one by one as you work through all the
-offenses in the code.
+file `.rubocop_todo.yml` contains configuration to disable cops that
+currently detect an offense in the code by excluding the offending
+files, or disabling the cop altogether once a file count limit has been
+reached.
+
+By adding the option `--exclude-limit COUNT`, e.g., `rubocop
+--auto-gen-config --exclude-limit 5`, you can change how many files are
+excluded before the cop is entirely disabled. The default COUNT is 15.
+
+Then you can start removing the entries in the generated
+`.rubocop_todo.yml` file one by one as you work through all the offenses
+in the code.
 
 ## Disabling Cops within Source Code
 
@@ -397,7 +561,7 @@ for x in (0..19) # rubocop:disable Style/AvoidFor
 You can change the output format of RuboCop by specifying formatters with the `-f/--format` option.
 RuboCop ships with several built-in formatters, and also you can create your custom formatter.
 
-Additionaly the output can be redirected to a file instead of `$stdout` with the `-o/--out` option.
+Additionally the output can be redirected to a file instead of `$stdout` with the `-o/--out` option.
 
 Some of the built-in formatters produce **machine-parsable** output
 and they are considered public APIs.
@@ -407,7 +571,7 @@ You can enable multiple formatters at the same time by specifying `-f/--format` 
 The `-o/--out` option applies to the previously specified `-f/--format`,
 or the default `progress` format if no `-f/--format` is specified before the `-o/--out` option.
 
-```bash
+```sh
 # Simple format to $stdout.
 $ rubocop --format simple
 
@@ -442,7 +606,7 @@ and at the end it displays all detected offenses in the `clang` format.
 A `.` represents a clean file, and each of the capital letters means
 the severest offense (convention, warning, error or fatal) found in a file.
 
-```
+```sh
 $ rubocop
 Inspecting 26 files
 ..W.C....C..CWCW.C...WC.CC
@@ -462,28 +626,36 @@ lib/foo.rb:6:5: C: Missing top-level class documentation comment.
 
 The `clang` formatter displays the offenses in a manner similar to `clang`:
 
-```
+```sh
 $ rubocop test.rb
-test.rb:1:1: C: Use snake_case for methods and variables.
+Inspecting 1 file
+W
+
+Offenses:
+
+test.rb:1:5: C: Use snake_case for method names.
 def badName
     ^^^^^^^
-test.rb:2:3: C: Favor modifier if/unless usage when you have a single-line body. Another good alternative is the usage of control flow &&/||.
+test.rb:2:3: C: Use a guard clause instead of wrapping the code inside a conditional expression.
+  if something
+  ^^
+test.rb:2:3: C: Favor modifier if usage when having a single-line body. Another good alternative is the usage of control flow &&/||.
   if something
   ^^
 test.rb:4:5: W: end at 4, 4 is not aligned with if at 2, 2
     end
     ^^^
 
-1 file inspected, 3 offenses detected
+1 file inspected, 4 offenses detected
 ```
 
 ### Fuubar Style Formatter
 
 The `fuubar` style formatter displays a progress bar
 and shows details of offenses in the `clang` format as soon as they are detected.
-This is inspired by the [Fuubar](https://github.com/jeffkreeftmeijer/fuubar) formatter for RSpec.
+This is inspired by the [Fuubar](https://github.com/thekompanee/fuubar) formatter for RSpec.
 
-```
+```sh
 $ rubocop --format fuubar
 lib/foo.rb.rb:1:1: C: Use snake_case for methods and variables.
 def badName
@@ -500,7 +672,7 @@ lib/bar.rb:13:14: W: File.exists? is deprecated in favor of File.exist?.
 
 The `emacs` formatter displays the offenses in a format suitable for consumption by `Emacs` (and possibly other tools).
 
-```
+```sh
 $ rubocop --format emacs test.rb
 /Users/bozhidar/projects/test.rb:1:1: C: Use snake_case for methods and variables.
 /Users/bozhidar/projects/test.rb:2:3: C: Favor modifier if/unless usage when you have a single-line body. Another good alternative is the usage of control flow &&/||.
@@ -511,14 +683,15 @@ $ rubocop --format emacs test.rb
 
 The name of the formatter says it all :-)
 
-```
+```sh
 $ rubocop --format simple test.rb
 == test.rb ==
-C:  1:  1: Use snake_case for methods and variables.
-C:  2:  3: Favor modifier if/unless usage when you have a single-line body. Another good alternative is the usage of control flow &&/||.
+C:  1:  5: Use snake_case for method names.
+C:  2:  3: Use a guard clause instead of wrapping the code inside a conditional expression.
+C:  2:  3: Favor modifier if usage when having a single-line body. Another good alternative is the usage of control flow &&/||.
 W:  4:  5: end at 4, 4 is not aligned with if at 2, 2
 
-1 file inspected, 3 offenses detected
+1 file inspected, 4 offenses detected
 ```
 
 ### File List Formatter
@@ -529,7 +702,7 @@ Sometimes you might want to just open all files with offenses in your
 favorite editor. This formatter outputs just the names of the files
 with offenses in them and makes it possible to do something like:
 
-```
+```sh
 $ rubocop --format files | xargs vim
 ```
 
@@ -594,7 +767,7 @@ see where most of your style cleanup is going to be spent.
 With this in mind, you can use the offense count formatter to outline the offended
 cops and the number of offenses found for each by running:
 
-```
+```sh
 $ rubocop --format offenses
 
 87   Documentation
@@ -612,6 +785,27 @@ $ rubocop --format offenses
 134  Total
 ```
 
+### Worst Offenders Formatter
+
+Similar to the Offense Count formatter, but lists the files which need the most attention:
+
+```sh
+$ rubocop --format worst
+
+89  this/file/is/really/bad.rb
+2   much/better.rb
+--
+91  Total
+```
+
+### HTML Formatter
+
+Useful for CI environments. It will create an HTML report like [this](http://f.cl.ly/items/0M3029412x3O091a1X1R/expected.html).
+
+```sh
+$ rubocop --format html -o rubocop.html
+```
+
 ## Compatibility
 
 RuboCop supports the following Ruby implementations:
@@ -619,6 +813,8 @@ RuboCop supports the following Ruby implementations:
 * MRI 1.9.3
 * MRI 2.0
 * MRI 2.1
+* MRI 2.2
+* MRI 2.3
 * JRuby in 1.9 mode
 * Rubinius 2.0+
 
@@ -630,7 +826,7 @@ RuboCop supports the following Ruby implementations:
 Emacs interface for RuboCop. It allows you to run RuboCop inside Emacs
 and quickly jump between problems in your code.
 
-[flycheck](https://github.com/lunaryorn/flycheck) > 0.9 also supports
+[flycheck](https://github.com/flycheck/flycheck) > 0.9 also supports
 RuboCop and uses it by default when available.
 
 ### Vim
@@ -649,7 +845,7 @@ useful.
 
 ### Brackets
 
-The [brackets-rubocop](https://github.com/smockle/brackets-rubocop)
+The [brackets-rubocop](https://github.com/smockle-archive/brackets-rubocop)
 extension displays RuboCop results in Brackets.
 It can be installed via the extension manager in Brackets.
 
@@ -661,21 +857,35 @@ Installation instructions can be found [here](https://github.com/mrdougal/textma
 
 ### Atom
 
-The [atom-lint](https://github.com/yujinakayama/atom-lint) package
-runs RuboCop and highlights the offenses in Atom.
-
-You can also use the [linter-rubocop](https://github.com/AtomLinter/linter-rubocop)
-plugin for Atom's [linter](https://github.com/AtomLinter/Linter).
+The [linter-rubocop](https://github.com/AtomLinter/linter-rubocop) plugin for Atom's
+[linter](https://github.com/AtomLinter/Linter) runs RuboCop and highlights the offenses in Atom.
 
 ### LightTable
 
 The [lt-rubocop](https://github.com/seancaffery/lt-rubocop) plugin
 provides LightTable integration.
 
+### RubyMine
+
+The [rubocop-for-rubymine](https://github.com/sirlantis/rubocop-for-rubymine) plugin
+provides basic RuboCop integration for RubyMine/IntelliJ IDEA.
+
 ### Other Editors
 
 Here's one great opportunity to contribute to RuboCop - implement
 RuboCop integration for your favorite editor.
+
+## Git pre-commit hook integration
+
+[overcommit](https://github.com/brigade/overcommit) is a fully configurable and
+extendable Git commit hook manager. To use RuboCop with overcommit, add the
+following to your `.overcommit.yml` file:
+
+```yaml
+PreCommit:
+  RuboCop:
+    enabled: true
+```
 
 ## Guard integration
 
@@ -685,7 +895,6 @@ like
 allows you to automatically check Ruby code style with RuboCop when
 files are modified.
 
-
 ## Rake integration
 
 To use RuboCop in your `Rakefile` add the following:
@@ -694,6 +903,13 @@ To use RuboCop in your `Rakefile` add the following:
 require 'rubocop/rake_task'
 
 RuboCop::RakeTask.new
+```
+
+If you run `rake -T`, the following two RuboCop tasks should show up:
+
+```sh
+rake rubocop                                  # Run RuboCop
+rake rubocop:auto_correct                     # Auto-correct RuboCop offenses
 ```
 
 The above will use default values
@@ -711,6 +927,68 @@ RuboCop::RakeTask.new(:rubocop) do |task|
 end
 ```
 
+## Exit codes
+
+RuboCop exits with the following status codes:
+
+- 0 if no offenses are found, or if the severity of all offenses are less than
+  `--fail-level`. (By default, if you use `--auto-correct`, offenses which are
+  auto-corrected do not cause RuboCop to fail.)
+- 1 if one or more offenses equal or greater to `--fail-level` are found. (By
+  default, this is any offense which is not auto-corrected.)
+- 2 if RuboCop terminates abnormally due to invalid configuration, invalid CLI
+  options, or an internal error.
+
+## Caching
+
+Large projects containing hundreds or even thousands of files can take
+a really long time to inspect, but RuboCop has functionality to
+mitigate this problem. There's a caching mechanism that stores
+information about offenses found in inspected files.
+
+### Cache Validity
+
+Later runs will be able to retrieve this information and present the
+stored information instead of inspecting the file again. This will be
+done if the cache for the file is still valid, which it is if there
+are no changes in:
+* the contents of the inspected file
+* RuboCop configuration for the file
+* the options given to `rubocop`, with some exceptions that have no
+  bearing on which offenses are reported
+* the Ruby version used to invoke `rubocop`
+* version of the `rubocop` program (or to be precise, anything in the
+  source code of the invoked `rubocop` program)
+
+### Enabling and Disabling the Cache
+
+The caching functionality is enabled if the configuration parameter
+`AllCops: UseCache` is `true`, which it is by default. The command
+line option `--cache false` can be used to turn off caching, thus
+overriding the configuration parameter. If `AllCops: UseCache` is set
+to `false` in the local `.rubocop.yml`, then it's `--cache true` that
+overrides the setting.
+
+### Cache Path
+
+By default, the cache is stored in in a subdirectory of the temporary
+directory, `/tmp/rubocop_cache/` on Unix-like systems. The
+configuration parameter `AllCops: CacheRootDirectory` can be used to
+set it to a different path. One reason to use this option could be
+that there's a network disk where users on different machines want to
+have a common RuboCop cache. Another could be that a Continuous
+Integration system allows directories, but not a temporary directory,
+to be saved between runs.
+
+### Cache Pruning
+
+Each time a file has changed, its offenses will be stored under a new
+key in the cache. This means that the cache will continue to grow
+until we do something to stop it. The configuration parameter
+`AllCops: MaxFilesInCache` sets a limit, and when the number of files
+in the cache exceeds that limit, the oldest files will be automatically
+removed from the cache.
+
 ## Extensions
 
 It's possible to extend RuboCop with custom cops and formatters.
@@ -727,7 +1005,7 @@ require:
  - rubocop-extension
 ```
 
-Note: The pathes are directly passed to `Kernel.require`.  If your
+Note: The paths are directly passed to `Kernel.require`.  If your
 extension file is not in `$LOAD_PATH`, you need to specify the path as
 relative path prefixed with `./` explicitly, or absolute path.
 
@@ -740,12 +1018,14 @@ other cop.
 
 * [rubocop-rspec](https://github.com/nevir/rubocop-rspec) -
   RSpec-specific analysis
+* [rubocop-cask](https://github.com/caskroom/rubocop-cask) - Analysis
+  for Homebrew-Cask files.
 
 ### Custom Formatters
 
 You can customize RuboCop's output format with custom formatters.
 
-#### Creating Custom Formatter
+#### Creating a Custom Formatter
 
 To implement a custom formatter, you need to subclass
 `RuboCop::Formatter::BaseFormatter` and override some methods,
@@ -753,18 +1033,18 @@ or implement all formatter API methods by duck typing.
 
 Please see the documents below for more formatter API details.
 
-* [RuboCop::Formatter::BaseFormatter](http://rubydoc.info/gems/rubocop/RuboCop/Formatter/BaseFormatter)
-* [RuboCop::Cop::Offense](http://rubydoc.info/gems/rubocop/RuboCop/Cop/Offense)
-* [Parser::Source::Range](http://rubydoc.info/github/whitequark/parser/Parser/Source/Range)
+* [RuboCop::Formatter::BaseFormatter](http://www.rubydoc.info/gems/rubocop/RuboCop/Formatter/BaseFormatter)
+* [RuboCop::Cop::Offense](http://www.rubydoc.info/gems/rubocop/RuboCop/Cop/Offense)
+* [Parser::Source::Range](http://www.rubydoc.info/github/whitequark/parser/Parser/Source/Range)
 
-#### Using Custom Formatter in Command Line
+#### Using a Custom Formatter from the Command Line
 
 You can tell RuboCop to use your custom formatter with a combination of
 `--format` and `--require` option.
 For example, when you have defined `MyCustomFormatter` in
 `./path/to/my_custom_formatter.rb`, you would type this command:
 
-```
+```sh
 $ rubocop --require ./path/to/my_custom_formatter --format MyCustomFormatter
 ```
 
@@ -787,7 +1067,7 @@ The logo is licensed under a
 
 ## Contributors
 
-Here's a [list](https://github.com/bbatsov/rubocop/contributors) of
+Here's a [list](https://github.com/bbatsov/rubocop/graphs/contributors) of
 all the people who have contributed to the development of RuboCop.
 
 I'm extremely grateful to each and every one of them!
@@ -802,11 +1082,11 @@ priority right now. Writing a new cop is a great way to dive into RuboCop!
 Of course, bug reports and suggestions for improvements are always
 welcome. GitHub pull requests are even better! :-)
 
-You can also support my work on RuboCop and
-[all my other projects](https://github.com/bbatsov) via
-[gratipay](https://www.gratipay.com/bbatsov).
+You can also support my work on RuboCop via
+[Salt](https://salt.bountysource.com/teams/rubocop) and
+[Gratipay](https://gratipay.com/rubocop/).
 
-[![Support via Gratipay](https://cdn.rawgit.com/gratipay/gratipay-badge/2.1.3/dist/gratipay.png)](https://gratipay.com/bbatsov)
+[![Support via Gratipay](https://cdn.rawgit.com/gratipay/gratipay-badge/2.1.3/dist/gratipay.png)](https://gratipay.com/rubocop/)
 
 ## Mailing List
 
@@ -824,5 +1104,5 @@ RuboCop's changelog is available [here](CHANGELOG.md).
 
 ## Copyright
 
-Copyright (c) 2012-2014 Bozhidar Batsov. See [LICENSE.txt](LICENSE.txt) for
+Copyright (c) 2012-2016 Bozhidar Batsov. See [LICENSE.txt](LICENSE.txt) for
 further details.

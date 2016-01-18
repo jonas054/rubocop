@@ -1,9 +1,10 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
-describe RuboCop::Cop::Style::Not do
-  subject(:cop) { described_class.new }
+describe RuboCop::Cop::Style::Not, :config do
+  subject(:cop) { described_class.new(config) }
 
   it 'registers an offense for not' do
     inspect_source(cop, 'not test')

@@ -1,18 +1,22 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     # FIXME
     class Team
-      attr_reader :errors, :updated_source_file
+      attr_reader :errors, :warnings, :updated_source_file
 
-      alias_method :updated_source_file?, :updated_source_file
+      alias updated_source_file? updated_source_file
 
       def initialize(cop_classes, config, options = nil)
         @cop_classes = cop_classes
         @config = config
         @options = options || { auto_correct: false, debug: false }
         @errors = []
+        @warnings = []
+
+        validate_config
       end
 
       def autocorrect?
@@ -37,9 +41,8 @@ module RuboCop
       end
 
       def cops
-        @cops ||= @cop_classes.each_with_object([]) do |cop_class, instances|
-          next unless cop_enabled?(cop_class)
-          instances << cop_class.new(@config, @options)
+        @cops ||= @cop_classes.select { |c| cop_enabled?(c) }.map do |cop_class|
+          cop_class.new(@config, @options)
         end
       end
 
@@ -66,8 +69,13 @@ module RuboCop
 
         return if new_source == buffer.source
 
-        filename = buffer.name
-        File.open(filename, 'w') { |f| f.write(new_source) }
+        if @options[:stdin]
+          # holds source read in from stdin, when --stdin option is used
+          @options[:stdin] = new_source
+        else
+          filename = buffer.name
+          File.open(filename, 'wb') { |f| f.write(new_source) }
+        end
         @updated_source_file = true
       end
 
@@ -75,25 +83,43 @@ module RuboCop
       # re-running of auto-corrections will make sure that the full set of
       # auto-corrections is tried again after this method has finished.
       def autocorrect_one_cop(buffer, cops)
-        cop_with_corrections = cops.find do |cop|
-          cop.relevant_file?(buffer.name) && cop.corrections.any?
-        end
+        cop_with_corrections = cops.find { |cop| cop.corrections.any? }
+
         if cop_with_corrections
-          corrector = Corrector.new(buffer, cop_with_corrections.corrections)
+          corrections = cop_with_corrections.corrections
+          corrector = Corrector.new(buffer, corrections)
           corrector.rewrite
         else
           buffer.source
         end
       end
 
+      def validate_config
+        cops.each do |cop|
+          cop.validate_config if cop.respond_to?(:validate_config)
+        end
+      end
+
       def process_commissioner_errors(file, file_errors)
         file_errors.each do |cop, errors|
           errors.each do |e|
-            handle_error(e,
-                         "An error occurred while #{cop.name}".color(:red) +
-                         " cop was inspecting #{file}.".color(:red))
+            if e.is_a?(Warning)
+              handle_warning(e,
+                             Rainbow("#{e.message} (from file: " \
+                             "#{file})").yellow)
+            else
+              handle_error(e,
+                           Rainbow("An error occurred while #{cop.name}" \
+                           " cop was inspecting #{file}.").red)
+            end
           end
         end
+      end
+
+      def handle_warning(e, message)
+        @warnings << message
+        warn message
+        puts e.backtrace if debug?
       end
 
       def handle_error(e, message)

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -16,11 +17,18 @@ module RuboCop
 
         def check_argument(variable)
           return unless variable.block_argument?
+
+          if cop_config['IgnoreEmptyBlocks']
+            _send, _args, body = *variable.scope.node
+            return if body.nil?
+          end
+
           super
         end
 
         def message(variable)
-          message = "Unused #{variable_type(variable)} - `#{variable.name}`."
+          message = String.new("Unused #{variable_type(variable)} - " \
+                               "`#{variable.name}`.")
 
           return message if variable.explicit_block_local_variable?
 
@@ -29,11 +37,11 @@ module RuboCop
           scope = variable.scope
           all_arguments = scope.variables.each_value.select(&:block_argument?)
 
-          if lambda?(scope.node)
-            message << message_for_lambda(variable, all_arguments)
-          else
-            message << message_for_normal_block(variable, all_arguments)
-          end
+          message << if scope.node.lambda?
+                       message_for_lambda(variable, all_arguments)
+                     else
+                       message_for_normal_block(variable, all_arguments)
+                     end
 
           message
         end
@@ -59,7 +67,7 @@ module RuboCop
         end
 
         def message_for_lambda(variable, all_arguments)
-          message = message_for_underscore_prefix(variable)
+          message = String.new(message_for_underscore_prefix(variable))
 
           if all_arguments.none?(&:referenced?)
             message << ' Also consider using a proc without arguments ' \

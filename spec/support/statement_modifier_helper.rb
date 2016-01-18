@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module StatementModifierHelper
   def check_empty(cop, keyword)
@@ -14,6 +15,14 @@ module StatementModifierHelper
     expect(cop.messages).to eq(
       ["Favor modifier `#{keyword}` usage when having a single-line body."])
     expect(cop.offenses.map { |o| o.location.source }).to eq([keyword])
+  end
+
+  def autocorrect_really_short(cop, keyword)
+    corrected = autocorrect_source(cop,
+                                   ["#{keyword} a",
+                                    '  b',
+                                    'end'])
+    expect(corrected).to eq "b #{keyword} a"
   end
 
   def check_too_long(cop, keyword)

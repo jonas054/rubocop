@@ -1,9 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
-describe RuboCop::Cop::Style::IndentationConsistency do
-  subject(:cop) { described_class.new }
+describe RuboCop::Cop::Style::IndentationConsistency, :config do
+  subject(:cop) { described_class.new(config) }
+
+  let(:cop_config) { { 'EnforcedStyle' => 'normal' } }
 
   context 'with if statement' do
     it 'registers an offense for bad indentation in an if body' do
@@ -60,8 +63,7 @@ describe RuboCop::Cop::Style::IndentationConsistency do
     end
 
     it 'accepts a one line if statement' do
-      inspect_source(cop,
-                     ['if cond then func1 else func2 end'])
+      inspect_source(cop, 'if cond then func1 else func2 end')
       expect(cop.offenses).to be_empty
     end
 
@@ -388,67 +390,108 @@ describe RuboCop::Cop::Style::IndentationConsistency do
   end
 
   context 'with class' do
-    it 'registers an offense for bad indentation in a class body' do
-      inspect_source(cop,
-                     ['class Test',
-                      '    def func1',
-                      '    end',
-                      '  def func2',
-                      '  end',
-                      'end'])
-      expect(cop.messages)
-        .to eq(['Inconsistent indentation detected.'])
+    context 'with rails style configured' do
+      let(:cop_config) { { 'EnforcedStyle' => 'rails' } }
+
+      it 'accepts different indentation in different visibility sections' do
+        inspect_source(cop,
+                       ['class Cat',
+                        '  def meow',
+                        "    puts('Meow!')",
+                        '  end',
+                        '',
+                        '  protected',
+                        '',
+                        '    def can_we_be_friends?(another_cat)',
+                        '      # some logic',
+                        '    end',
+                        '',
+                        '    def related_to?(another_cat)',
+                        '      # some logic',
+                        '    end',
+                        '',
+                        '  private',
+                        '',
+                        # Here we go back an indentation level again. This is a
+                        # violation of the Rails style, but it's not for this
+                        # cop to report. Style/IndentationWidth will handle it.
+                        '  def meow_at_3am?',
+                        '    rand < 0.8',
+                        '  end',
+                        '',
+                        # As long as the indentation of this method is
+                        # consistent with that of the last one, we're fine.
+                        '  def meow_at_4am?',
+                        '    rand < 0.8',
+                        '  end',
+                        'end'])
+        expect(cop.offenses).to be_empty
+      end
     end
 
-    it 'accepts an empty class body' do
-      inspect_source(cop,
-                     ['class Test',
-                      'end'])
-      expect(cop.offenses).to be_empty
-    end
+    context 'with normal style configured' do
+      it 'registers an offense for bad indentation in a class body' do
+        inspect_source(cop,
+                       ['class Test',
+                        '    def func1',
+                        '    end',
+                        '  def func2',
+                        '  end',
+                        'end'])
+        expect(cop.messages)
+          .to eq(['Inconsistent indentation detected.'])
+      end
 
-    it 'accepts indented public, protected, and private' do
-      inspect_source(cop,
-                     ['class Test',
-                      '  public',
-                      '',
-                      '  def e',
-                      '  end',
-                      '',
-                      '  protected',
-                      '',
-                      '  def f',
-                      '  end',
-                      '',
-                      '  private',
-                      '',
-                      '  def g',
-                      '  end',
-                      'end'])
-      expect(cop.offenses).to be_empty
-    end
+      it 'accepts an empty class body' do
+        inspect_source(cop,
+                       ['class Test',
+                        'end'])
+        expect(cop.offenses).to be_empty
+      end
 
-    it 'registers an offense for bad indentation in def but not for ' \
-       'outdented public, protected, and private' do
-      inspect_source(cop,
-                     ['class Test',
-                      'public',
-                      '',
-                      '  def e',
-                      '  end',
-                      '',
-                      'protected',
-                      '',
-                      '  def f',
-                      '  end',
-                      '',
-                      'private',
-                      '',
-                      ' def g',
-                      ' end',
-                      'end'])
-      expect(cop.messages).to eq(['Inconsistent indentation detected.'])
-      expect(cop.highlights).to eq(["def g\n end"])
+      it 'accepts indented public, protected, and private' do
+        inspect_source(cop,
+                       ['class Test',
+                        '  public',
+                        '',
+                        '  def e',
+                        '  end',
+                        '',
+                        '  protected',
+                        '',
+                        '  def f',
+                        '  end',
+                        '',
+                        '  private',
+                        '',
+                        '  def g',
+                        '  end',
+                        'end'])
+        expect(cop.offenses).to be_empty
+      end
+
+      it 'registers an offense for bad indentation in def but not for ' \
+         'outdented public, protected, and private' do
+        inspect_source(cop,
+                       ['class Test',
+                        'public',
+                        '',
+                        '  def e',
+                        '  end',
+                        '',
+                        'protected',
+                        '',
+                        '  def f',
+                        '  end',
+                        '',
+                        'private',
+                        '',
+                        ' def g',
+                        ' end',
+                        'end'])
+        expect(cop.messages).to eq(['Inconsistent indentation detected.'])
+        expect(cop.highlights).to eq(["def g\n end"])
+      end
     end
   end
 
@@ -505,6 +548,37 @@ describe RuboCop::Cop::Style::IndentationConsistency do
                      ['a = func do',
                       'end'])
       expect(cop.offenses).to be_empty
+    end
+
+    it 'does not auto-correct an offense within another offense' do
+      corrected = autocorrect_source(cop,
+                                     ["require 'spec_helper'",
+                                      'describe ArticlesController do',
+                                      '  render_views',
+                                      '    describe "GET \'index\'" do',
+                                      '            it "returns success" do',
+                                      '            end',
+                                      '        describe "admin user" do',
+                                      '             before(:each) do',
+                                      '            end',
+                                      '        end',
+                                      '    end',
+                                      'end'])
+      expect(cop.offenses.map(&:line)).to eq [4, 7] # Two offenses are found.
+
+      # The offense on line 4 is corrected, affecting lines 4 to 11.
+      expect(corrected).to eq ["require 'spec_helper'",
+                               'describe ArticlesController do',
+                               '  render_views',
+                               "  describe \"GET 'index'\" do",
+                               '          it "returns success" do',
+                               '          end',
+                               '      describe "admin user" do',
+                               '           before(:each) do',
+                               '          end',
+                               '      end',
+                               '  end',
+                               'end'].join("\n")
     end
   end
 end

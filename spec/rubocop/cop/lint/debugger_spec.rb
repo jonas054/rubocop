@@ -1,60 +1,55 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
 describe RuboCop::Cop::Lint::Debugger do
-  subject(:cop) { described_class.new  }
+  subject(:cop) { described_class.new }
 
-  it 'reports an offense for a debugger call' do
-    src = ['debugger']
-    inspect_source(cop, src)
+  include_examples 'debugger', 'debugger', 'debugger'
+  include_examples 'debugger', 'byebug', 'byebug'
+  include_examples 'debugger', 'pry binding', %w(binding.pry binding.remote_pry
+                                                 binding.pry_remote)
+  include_examples 'debugger',
+                   'capybara debug method', %w(save_and_open_page
+                                               save_and_open_screenshot
+                                               save_screenshot)
+  include_examples 'debugger', 'debugger with an argument', 'debugger foo'
+  include_examples 'debugger', 'byebug with an argument', 'byebug foo'
+  include_examples 'debugger',
+                   'pry binding with an argument', ['binding.pry foo',
+                                                    'binding.remote_pry foo',
+                                                    'binding.pry_remote foo']
+  include_examples 'debugger',
+                   'capybara debug method with an argument',
+                   ['save_and_open_page foo',
+                    'save_and_open_screenshot foo',
+                    'save_screenshot foo']
+  include_examples 'non-debugger', 'a non-pry binding', 'binding.pirate'
+
+  ALL_COMMANDS = %w(debugger byebug pry remote_pry pry_remote
+                    save_and_open_page save_and_open_screenshot
+                    save_screenshot).freeze
+
+  ALL_COMMANDS.each do |src|
+    include_examples 'non-debugger', "a #{src} in comments", "# #{src}"
+    include_examples 'non-debugger', "a #{src} method", "code.#{src}"
+  end
+
+  it 'reports an offense for a Pry.rescue call' do
+    inspect_source(cop, ['def method',
+                         '  Pry.rescue { puts 1 }',
+                         'end'])
     expect(cop.offenses.size).to eq(1)
-    expect(cop.messages).to eq(['Remove debugger entry point `debugger`.'])
-    expect(cop.highlights).to eq(['debugger'])
+    expect(cop.messages).to eq(['Remove debugger entry point `Pry.rescue`.'])
   end
 
-  it 'reports an offense for a byebug call' do
-    src = ['byebug']
-    inspect_source(cop, src)
-    expect(cop.offenses.size).to eq(1)
-    expect(cop.messages).to eq(['Remove debugger entry point `byebug`.'])
-    expect(cop.highlights).to eq(['byebug'])
-  end
-
-  it 'reports an offense for pry bindings' do
-    src = ['binding.pry',
-           'binding.remote_pry',
-           'binding.pry_remote']
-    inspect_source(cop, src)
-    expect(cop.offenses.size).to eq(3)
-    expect(cop.messages)
-      .to eq(['Remove debugger entry point `binding.pry`.',
-              'Remove debugger entry point `binding.remote_pry`.',
-              'Remove debugger entry point `binding.pry_remote`.'])
-    expect(cop.highlights).to eq(['binding.pry',
-                                  'binding.remote_pry',
-                                  'binding.pry_remote'])
-  end
-
-  it 'does not report an offense for non-pry binding' do
-    src = ['binding.pirate']
-    inspect_source(cop, src)
-    expect(cop.offenses).to be_empty
-  end
-
-  %w(debugger byebug pry remote_pry pry_remote).each do |comment|
-    it "does not report an offense for #{comment} in comments" do
-      src = ["# #{comment}"]
-      inspect_source(cop, src)
-      expect(cop.offenses).to be_empty
-    end
-  end
-
-  %w(debugger byebug pry remote_pry pry_remote).each do |method_name|
-    it "does not report an offense for a #{method_name} method" do
-      src = ["code.#{method_name}"]
-      inspect_source(cop, src)
-      expect(cop.offenses).to be_empty
-    end
+  it 'can autocorrect Pry.rescue' do
+    new_source = autocorrect_source(cop, ['def method',
+                                          '  Pry.rescue { puts 1 }',
+                                          'end'])
+    expect(new_source).to eq(['def method',
+                              '  puts 1',
+                              'end'].join("\n"))
   end
 end

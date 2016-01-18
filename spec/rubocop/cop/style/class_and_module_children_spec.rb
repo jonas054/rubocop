@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -9,7 +10,8 @@ describe RuboCop::Cop::Style::ClassAndModuleChildren, :config do
     let(:cop_config) { { 'EnforcedStyle' => 'nested' } }
 
     it 'registers an offense for not nested classes' do
-      inspect_source(cop, ['class FooClass::BarClass', 'end'])
+      inspect_source(cop, ['class FooClass::BarClass',
+                           'end'])
 
       expect(cop.offenses.size).to eq 1
       expect(cop.messages).to eq [
@@ -19,7 +21,8 @@ describe RuboCop::Cop::Style::ClassAndModuleChildren, :config do
     end
 
     it 'registers an offense for not nested modules' do
-      inspect_source(cop, ['module FooModule::BarModule', 'end'])
+      inspect_source(cop, ['module FooModule::BarModule',
+                           'end'])
 
       expect(cop.offenses.size).to eq 1
       expect(cop.messages).to eq [

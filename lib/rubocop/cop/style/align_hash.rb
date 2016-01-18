@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -19,11 +20,11 @@ module RuboCop
             {} # The first pair is always considered correct.
           end
 
-          def deltas(first_pair, prev_pair, current_pair)
-            if current_pair.loc.line == prev_pair.loc.line
-              {}
-            else
+          def deltas(first_pair, current_pair)
+            if Util.begins_its_line?(current_pair.source_range)
               { key: first_pair.loc.column - current_pair.loc.column }
+            else
+              {}
             end
           end
         end
@@ -31,11 +32,13 @@ module RuboCop
         # Common functionality for the styles where not only keys, but also
         # values are aligned.
         class AlignmentOfValues
+          include HashNode # any_pairs_on_the_same_line?
+
           def checkable_layout(node)
-            !any_pairs_on_the_same_line?(node) && all_have_same_sparator?(node)
+            !any_pairs_on_the_same_line?(node) && all_have_same_separator?(node)
           end
 
-          def deltas(first_pair, _prev_pair, current_pair)
+          def deltas(first_pair, current_pair)
             key_delta = key_delta(first_pair, current_pair)
             current_separator = current_pair.loc.operator
             separator_delta = separator_delta(first_pair, current_separator,
@@ -56,17 +59,9 @@ module RuboCop
             end
           end
 
-          def any_pairs_on_the_same_line?(node)
-            lines_of_the_children = node.children.map do |pair|
-              key, _value = *pair
-              key.loc.line
-            end
-            lines_of_the_children.uniq.size < lines_of_the_children.size
-          end
-
-          def all_have_same_sparator?(node)
+          def all_have_same_separator?(node)
             first_separator = node.children.first.loc.operator.source
-            node.children[1..-1].all? do |pair|
+            node.children.butfirst.all? do |pair|
               pair.loc.operator.is?(first_separator)
             end
           end
@@ -79,7 +74,7 @@ module RuboCop
           def deltas_for_first_pair(first_pair, node)
             key_widths = node.children.map do |pair|
               key, _value = *pair
-              key.loc.expression.source.length
+              key.source.length
             end
             @max_key_width = key_widths.max
 
@@ -103,7 +98,7 @@ module RuboCop
           end
 
           def value_delta(first_pair, current_pair)
-            first_key, _ = *first_pair
+            first_key, = *first_pair
             _, current_value = *current_pair
             correct_value_column = first_key.loc.column +
                                    spaced_separator(current_pair).length +
@@ -130,7 +125,7 @@ module RuboCop
 
           def key_end_column(pair)
             key, _value = *pair
-            key.loc.column + key.loc.expression.source.length
+            key.loc.column + key.source.length
           end
 
           def hash_rocket_delta(first_pair, current_separator)
@@ -145,7 +140,7 @@ module RuboCop
         end
 
         MSG = 'Align the elements of a hash literal if they span more than ' \
-              'one line.'
+              'one line.'.freeze
 
         def on_send(node)
           return unless (last_child = node.children.last) &&
@@ -158,7 +153,7 @@ module RuboCop
         def on_hash(node)
           return if ignored_node?(node)
           return if node.children.empty?
-          return unless multiline?(node)
+          return unless node.multiline?
 
           @alignment_for_hash_rockets ||=
             new_alignment('EnforcedHashRocketStyle')
@@ -180,9 +175,8 @@ module RuboCop
                            .deltas_for_first_pair(first_pair, node)
           add_offense(first_pair, :expression) unless good_alignment?
 
-          node.children.each_cons(2) do |prev, current|
-            @column_deltas = alignment_for(current).deltas(first_pair, prev,
-                                                           current)
+          node.children.each do |current|
+            @column_deltas = alignment_for(current).deltas(first_pair, current)
             add_offense(current, :expression) unless good_alignment?
           end
         end
@@ -204,17 +198,6 @@ module RuboCop
           node.loc.begin
         end
 
-        # Returns true if the hash spans multiple lines
-        def multiline?(node)
-          return false unless node.loc.expression.source.include?("\n")
-
-          return false if node.children[1..-1].all? do |child|
-            !begins_its_line?(child.loc.expression)
-          end
-
-          true
-        end
-
         def alignment_for(pair)
           if pair.loc.operator.is?('=>')
             @alignment_for_hash_rockets
@@ -232,11 +215,17 @@ module RuboCop
           value_delta     = @column_deltas[:value] || 0
 
           key, value = *node
+          key_column = key.source_range.column
+          key_delta = -key_column if key_delta < -key_column
 
-          @corrections << lambda do |corrector|
-            adjust(corrector, key_delta, key.loc.expression)
-            adjust(corrector, separator_delta, node.loc.operator)
-            adjust(corrector, value_delta, value.loc.expression)
+          lambda do |corrector|
+            if value.nil?
+              adjust(corrector, key_delta, node.source_range)
+            else
+              adjust(corrector, key_delta, key.source_range)
+              adjust(corrector, separator_delta, node.loc.operator)
+              adjust(corrector, value_delta, value.source_range)
+            end
           end
         end
 

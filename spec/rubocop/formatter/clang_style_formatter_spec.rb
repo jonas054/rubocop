@@ -1,7 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'stringio'
 
 module RuboCop
   module Formatter
@@ -35,7 +35,7 @@ module RuboCop
           it 'does not display offending source line' do
             cop = Cop::Cop.new
             source_buffer = Parser::Source::Buffer.new('test', 1)
-            source_buffer.source = (['     ', 'yaba']).to_a.join($RS)
+            source_buffer.source = ['     ', 'yaba'].join($RS)
             cop.add_offense(nil,
                             Parser::Source::Range.new(source_buffer, 0, 2),
                             'message 1')
@@ -80,7 +80,7 @@ module RuboCop
 
         let(:offense) do
           Cop::Offense.new(:convention, location,
-                           'This is a message.', 'CopName', corrected)
+                           'This is a message.', 'CopName', status)
         end
 
         let(:location) do
@@ -90,7 +90,7 @@ module RuboCop
         end
 
         context 'when the offense is not corrected' do
-          let(:corrected) { false }
+          let(:status) { :uncorrected }
 
           it 'prints message as-is' do
             formatter.report_file(file, [offense])
@@ -100,7 +100,7 @@ module RuboCop
         end
 
         context 'when the offense is automatically corrected' do
-          let(:corrected) { true }
+          let(:status) { :corrected }
 
           it 'prints [Corrected] along with message' do
             formatter.report_file(file, [offense])

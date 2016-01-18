@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -7,12 +8,12 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
 
   shared_examples 'accepts quote characters' do
     it 'accepts single quotes' do
-      inspect_source(cop, ["'hi'"])
+      inspect_source(cop, "'hi'")
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts double quotes' do
-      inspect_source(cop, ['"hi"'])
+      inspect_source(cop, '"hi"')
       expect(cop.offenses).to be_empty
     end
   end
@@ -20,12 +21,12 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
   shared_examples 'accepts any q string with backslash t' do
     context 'with special characters' do
       it 'accepts %q' do
-        inspect_source(cop, ['%q(\t)'])
+        inspect_source(cop, '%q(\t)')
         expect(cop.offenses).to be_empty
       end
 
       it 'accepts %Q' do
-        inspect_source(cop, ['%Q(\t)'])
+        inspect_source(cop, '%Q(\t)')
         expect(cop.offenses).to be_empty
       end
     end
@@ -36,12 +37,12 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
 
     context 'without interpolation' do
       it 'accepts %q' do
-        inspect_source(cop, ['%q(hi)'])
+        inspect_source(cop, '%q(hi)')
         expect(cop.offenses).to be_empty
       end
 
       it 'registers offense for %Q' do
-        inspect_source(cop, ['%Q(hi)'])
+        inspect_source(cop, '%Q(hi)')
         expect(cop.messages)
           .to eq(['Do not use `%Q` unless interpolation is needed.  Use `%q`.'])
         expect(cop.highlights).to eq(['%Q('])
@@ -58,13 +59,13 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
 
     context 'with interpolation' do
       it 'accepts %Q' do
-        inspect_source(cop, ['%Q(#{1 + 2})'])
+        inspect_source(cop, '%Q(#{1 + 2})')
         expect(cop.offenses).to be_empty
       end
 
       it 'accepts %q' do
-        # This is most probably a mistake, but not this cop's responisibility.
-        inspect_source(cop, ['%q(#{1 + 2})'])
+        # This is most probably a mistake, but not this cop's responsibility.
+        inspect_source(cop, '%q(#{1 + 2})')
         expect(cop.offenses).to be_empty
       end
 
@@ -77,13 +78,13 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
 
     context 'without interpolation' do
       it 'registers offense for %q' do
-        inspect_source(cop, ['%q(hi)'])
+        inspect_source(cop, '%q(hi)')
         expect(cop.messages).to eq(['Use `%Q` instead of `%q`.'])
         expect(cop.highlights).to eq(['%q('])
       end
 
       it 'accepts %Q' do
-        inspect_source(cop, ['%Q(hi)'])
+        inspect_source(cop, '%Q(hi)')
         expect(cop.offenses).to be_empty
       end
 
@@ -98,7 +99,7 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
 
     context 'with interpolation' do
       it 'accepts %Q' do
-        inspect_source(cop, ['%Q(#{1 + 2})'])
+        inspect_source(cop, '%Q(#{1 + 2})')
         expect(cop.offenses).to be_empty
       end
 
@@ -106,7 +107,7 @@ describe RuboCop::Cop::Style::PercentQLiterals, :config do
         # It's strange if interpolation syntax appears inside a static string,
         # but we can't be sure if it's a mistake or not. Changing it to %Q
         # would alter semantics, so we leave it as it is.
-        inspect_source(cop, ['%q(#{1 + 2})'])
+        inspect_source(cop, '%q(#{1 + 2})')
         expect(cop.offenses).to be_empty
       end
 

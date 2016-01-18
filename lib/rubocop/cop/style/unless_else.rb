@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop looks for *unless* expressions with *else* clauses.
       class UnlessElse < Cop
         MSG = 'Do not use `unless` with `else`. Rewrite these with the ' \
-              'positive case first.'
+              'positive case first.'.freeze
 
         def on_if(node)
           loc = node.loc

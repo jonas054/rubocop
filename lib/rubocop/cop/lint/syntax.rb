@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,10 +7,11 @@ module RuboCop
       # This is actually not a cop and inspects nothing. It just provides
       # methods to repack Parser's diagnostics/errors into RuboCop's offenses.
       module Syntax
-        PseudoSourceRange = Struct.new(:line, :column, :source_line)
+        PseudoSourceRange = Struct.new(:line, :column, :source_line, :begin_pos,
+                                       :end_pos)
 
         COP_NAME = 'Syntax'.freeze
-        ERROR_SOURCE_RANGE = PseudoSourceRange.new(1, 0, '').freeze
+        ERROR_SOURCE_RANGE = PseudoSourceRange.new(1, 0, '', 0, 1).freeze
 
         def self.offenses_from_processed_source(processed_source)
           offenses = []
@@ -19,17 +21,19 @@ module RuboCop
           end
 
           processed_source.diagnostics.each do |diagnostic|
-            offenses << offense_from_diagnostic(diagnostic)
+            offenses << offense_from_diagnostic(diagnostic,
+                                                processed_source.ruby_version)
           end
 
           offenses
         end
 
-        def self.offense_from_diagnostic(diagnostic)
+        def self.offense_from_diagnostic(diagnostic, ruby_version)
           Offense.new(
             diagnostic.level,
             diagnostic.location,
-            diagnostic.message,
+            "#{diagnostic.message}\n(Using Ruby #{ruby_version} parser; " \
+            'configure using `TargetRubyVersion` parameter, under `AllCops`)',
             COP_NAME
           )
         end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -18,7 +19,7 @@ module RuboCop
       #   # good
       #   'a'..'z'
       class SpaceInsideRangeLiteral < Cop
-        MSG = 'Space inside range literal.'
+        MSG = 'Space inside range literal.'.freeze
 
         def on_irange(node)
           check(node)
@@ -31,7 +32,7 @@ module RuboCop
         private
 
         def check(node)
-          expression = node.loc.expression.source
+          expression = node.source
           op = node.loc.operator.source
           escaped_op = op.gsub(/\./, '\.')
 
@@ -44,13 +45,13 @@ module RuboCop
         end
 
         def autocorrect(node)
-          expression = node.loc.expression.source
+          expression = node.source
           operator = node.loc.operator.source
           operator_escaped = operator.gsub(/\./, '\.')
 
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             corrector.replace(
-              node.loc.expression,
+              node.source_range,
               expression
                 .sub(/\s+#{operator_escaped}/, operator)
                 .sub(/#{operator_escaped}\s+/, operator)

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -6,7 +7,7 @@ describe RuboCop::Cop::Style::RedundantBegin do
   subject(:cop) { described_class.new }
 
   it 'reports an offense for single line def with redundant begin block' do
-    src = ['  def func; begin; x; y; rescue; z end end']
+    src = '  def func; begin; x; y; rescue; z end end'
     inspect_source(cop, src)
     expect(cop.offenses.size).to eq(1)
   end
@@ -71,10 +72,12 @@ describe RuboCop::Cop::Style::RedundantBegin do
            '    end',
            '  end'].join("\n")
     result_src = ['  def func',
-                  '    foo',
-                  '    bar',
-                  '  rescue',
-                  '    baz',
+                  '    ',
+                  '      foo',
+                  '      bar',
+                  '    rescue',
+                  '      baz',
+                  '    ',
                   '  end'].join("\n")
     new_source = autocorrect_source(cop, src)
     expect(new_source).to eq(result_src)
@@ -82,7 +85,7 @@ describe RuboCop::Cop::Style::RedundantBegin do
 
   it 'auto-corrects by removing redundant begin blocks' do
     src = '  def func; begin; x; y; rescue; z end end'
-    result_src = '  def func; x; y; rescue; z end'
+    result_src = '  def func; ; x; y; rescue; z  end'
     new_source = autocorrect_source(cop, src)
     expect(new_source).to eq(result_src)
   end
@@ -98,22 +101,41 @@ describe RuboCop::Cop::Style::RedundantBegin do
            '      foo',
            '    end',
            '',
-           '  rescue => e',
+           '  rescue => e # some problem',
            '    bar',
            '  end',
            'end']
 
     result_src = ['def method',
-                  '  BlockA do |strategy|',
-                  '    foo',
-                  '  end',
+                  '  ',
+                  '    BlockA do |strategy|',
+                  '      foo',
+                  '    end',
                   '',
-                  '  BlockB do |portfolio|',
-                  '    foo',
-                  '  end',
+                  '    BlockB do |portfolio|',
+                  '      foo',
+                  '    end',
                   '',
-                  'rescue => e',
-                  '  bar',
+                  '  rescue => e # some problem',
+                  '    bar',
+                  '  ',
+                  'end'].join("\n")
+    new_source = autocorrect_source(cop, src)
+    expect(new_source).to eq(result_src)
+  end
+
+  it 'auto-corrects when there are trailing comments' do
+    src = ['def method',
+           '  begin # comment 1',
+           '    do_some_stuff',
+           '  rescue # comment 2',
+           '  end # comment 3',
+           'end']
+    result_src = ['def method',
+                  '   # comment 1',
+                  '    do_some_stuff',
+                  '  rescue # comment 2',
+                  '   # comment 3',
                   'end'].join("\n")
     new_source = autocorrect_source(cop, src)
     expect(new_source).to eq(result_src)

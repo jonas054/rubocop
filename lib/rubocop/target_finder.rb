@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'set'
 
@@ -80,13 +81,45 @@ module RuboCop
       base_dir_config.file_to_include?(file)
     end
 
+    # Search for files recursively starting at the given base directory using
+    # the given flags that determine how the match is made. Excluded files will
+    # be removed later by the caller, but as an optimization find_files removes
+    # the top level directories that are excluded in configuration in the
+    # normal way (dir/**/*).
     def find_files(base_dir, flags)
-      Dir.glob("#{base_dir}/**/*", flags).select { |path| FileTest.file?(path) }
+      wanted_toplevel_dirs = toplevel_dirs(base_dir, flags) -
+                             excluded_dirs(base_dir)
+      wanted_toplevel_dirs.map! { |dir| dir << '/**/*' }
+
+      pattern = if wanted_toplevel_dirs.empty?
+                  # We need this special case to avoid creating the pattern
+                  # /**/* which searches the entire file system.
+                  ["#{base_dir}/**/*"]
+                else
+                  # Search the non-excluded top directories, but also add files
+                  # on the top level, which would otherwise not be found.
+                  wanted_toplevel_dirs.unshift("#{base_dir}/*")
+                end
+      Dir.glob(pattern, flags).select { |path| FileTest.file?(path) }
+    end
+
+    def toplevel_dirs(base_dir, flags)
+      Dir.glob(File.join(base_dir, '*'), flags).select do |dir|
+        File.directory?(dir) && !dir.end_with?('/.', '/..')
+      end
+    end
+
+    def excluded_dirs(base_dir)
+      all_cops_config = @config_store.for(base_dir)['AllCops']
+      dir_tree_excludes = all_cops_config['Exclude'].select do |pattern|
+        pattern.is_a?(String) && pattern.end_with?('/**/*')
+      end
+      dir_tree_excludes.map { |pattern| pattern.sub(%r{/\*\*/\*$}, '') }
     end
 
     def ruby_executable?(file)
       return false unless File.extname(file).empty?
-      first_line = File.open(file) { |f| f.readline }
+      first_line = File.open(file, &:readline)
       first_line =~ /#!.*ruby/
     rescue EOFError, ArgumentError => e
       warn "Unprocessable file #{file}: #{e.class}, #{e.message}" if debug?

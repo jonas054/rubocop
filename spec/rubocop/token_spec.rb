@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -8,7 +9,7 @@ describe RuboCop::Token do
     let(:parser_token) { [type, [text, range]] }
     let(:type) { :kDEF }
     let(:text) { 'def' }
-    let(:range) { double('range') }
+    let(:range) { double('range', line: 42, column: 30) }
 
     it "sets parser token's type to rubocop token's type" do
       expect(token.type).to eq(type)
@@ -20,6 +21,10 @@ describe RuboCop::Token do
 
     it "sets parser token's range to rubocop token's pos" do
       expect(token.pos).to eq(range)
+    end
+
+    it 'returns a #to_s useful for debugging' do
+      expect(token.to_s).to eq('[[42, 30], kDEF, "def"]')
     end
   end
 end

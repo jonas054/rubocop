@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -21,11 +22,9 @@ module RuboCop
         end
 
         def code_length(node)
-          lines = node.loc.expression.source.lines.to_a[1..-2] || []
+          lines = node.source.lines.to_a[1..-2] || []
 
-          lines.reject! { |line| irrelevant_line(line) }
-
-          lines.size
+          lines.count { |line| !irrelevant_line(line) }
         end
       end
     end

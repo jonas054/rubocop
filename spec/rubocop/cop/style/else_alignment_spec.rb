@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -12,8 +13,7 @@ describe RuboCop::Cop::Style::ElseAlignment do
   end
 
   it 'accepts a ternary if' do
-    inspect_source(cop,
-                   ['cond ? func1 : func2'])
+    inspect_source(cop, 'cond ? func1 : func2')
     expect(cop.offenses).to be_empty
   end
 
@@ -40,6 +40,18 @@ describe RuboCop::Cop::Style::ElseAlignment do
       expect(cop.highlights).to eq(['elsif'])
     end
 
+    it 'accepts indentation after else when if is on new line after ' \
+       'assignment' do
+      inspect_source(cop,
+                     ['Rails.application.config.ideal_postcodes_key =',
+                      '  if Rails.env.production? || Rails.env.staging?',
+                      '    "AAAA-AAAA-AAAA-AAAA"',
+                      '  else',
+                      '    "BBBB-BBBB-BBBB-BBBB"',
+                      '  end'])
+      expect(cop.offenses).to be_empty
+    end
+
     describe '#autocorrect' do
       it 'corrects bad alignment' do
         corrected = autocorrect_source(cop,
@@ -64,8 +76,7 @@ describe RuboCop::Cop::Style::ElseAlignment do
     end
 
     it 'accepts a one line if statement' do
-      inspect_source(cop,
-                     ['if cond then func1 else func2 end'])
+      inspect_source(cop, 'if cond then func1 else func2 end')
       expect(cop.offenses).to be_empty
     end
 
@@ -84,12 +95,24 @@ describe RuboCop::Cop::Style::ElseAlignment do
     context 'with assignment' do
       context 'when alignment style is variable' do
         context 'and end is aligned with variable' do
-          it 'accepts an if with end aligned with setter' do
+          it 'accepts an if-else with end aligned with setter' do
             inspect_source(cop,
                            ['foo.bar = if baz',
                             '  derp1',
                             'else',
                             '  derp2',
+                            'end'])
+            expect(cop.offenses).to be_empty
+          end
+
+          it 'accepts an if-elsif-else with end aligned with setter' do
+            inspect_source(cop,
+                           ['foo.bar = if baz',
+                            '  derp1',
+                            'elsif meh',
+                            '  derp2',
+                            'else',
+                            '  derp3',
                             'end'])
             expect(cop.offenses).to be_empty
           end
@@ -134,14 +157,17 @@ describe RuboCop::Cop::Style::ElseAlignment do
         end
 
         context 'and end is aligned with keyword' do
-          it 'registers an offense for an if with setter' do
+          it 'registers offenses for an if with setter' do
             inspect_source(cop,
                            ['foo.bar = if baz',
                             '            derp1',
-                            '          else',
+                            '          elsif meh',
                             '            derp2',
+                            '          else',
+                            '            derp3',
                             '          end'])
-            expect(cop.messages).to eq(['Align `else` with `foo.bar`.'])
+            expect(cop.messages).to eq(['Align `elsif` with `foo.bar`.',
+                                        'Align `else` with `foo.bar`.'])
           end
 
           it 'registers an offense for an if with element assignment' do
@@ -431,7 +457,51 @@ describe RuboCop::Cop::Style::ElseAlignment do
     end
   end
 
+  context 'with def/rescue/else/ensure/end' do
+    it 'accepts a correctly aligned else' do
+      inspect_source(cop,
+                     ['def my_func(string)',
+                      '  puts string',
+                      'rescue => e',
+                      '  puts e',
+                      'else',
+                      '  puts e',
+                      'ensure',
+                      "  puts 'I love methods that print'",
+                      'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for misaligned else' do
+      inspect_source(cop,
+                     ['def my_func(string)',
+                      '  puts string',
+                      'rescue => e',
+                      '  puts e',
+                      '  else',
+                      '  puts e',
+                      'ensure',
+                      "  puts 'I love methods that print'",
+                      'end'])
+      expect(cop.messages).to eq(['Align `else` with `def`.'])
+    end
+  end
+
   context 'with def/rescue/else/end' do
+    it 'accepts a correctly aligned else' do
+      inspect_source(cop,
+                     ['def my_func',
+                      "  puts 'do something error prone'",
+                      'rescue SomeException',
+                      "  puts 'error handling'",
+                      'rescue',
+                      "  puts 'error handling'",
+                      'else',
+                      "  puts 'normal handling'",
+                      'end'])
+      expect(cop.messages).to be_empty
+    end
+
     it 'registers an offense for misaligned else' do
       inspect_source(cop,
                      ['def my_func',

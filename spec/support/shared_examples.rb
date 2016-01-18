@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 # `cop` and `source` must be declared with #let.
 
@@ -34,22 +35,65 @@ end
 
 shared_examples_for 'misaligned' do |prefix, alignment_base, arg, end_kw, name|
   name ||= alignment_base
+  source = ["#{prefix}#{alignment_base} #{arg}",
+            end_kw]
+
   it "registers an offense for mismatched #{name} ... end" do
-    inspect_source(cop, ["#{prefix}#{alignment_base} #{arg}",
-                         end_kw])
+    inspect_source(cop, source)
     expect(cop.offenses.size).to eq(1)
-    regexp = /`end` at 2, \d+ is not aligned with `#{alignment_base}` at 1,/
+    base_regexp = Regexp.escape(alignment_base)
+    regexp = /`end` at 2, \d+ is not aligned with `#{base_regexp}` at 1,/
     expect(cop.messages.first).to match(regexp)
     expect(cop.highlights.first).to eq('end')
-    expect(cop.config_to_allow_offenses).to eq('AlignWith' => opposite)
+
+    other_styles = (cop.supported_styles - [cop.style]).map(&:to_s)
+    # In some cases, the code under test will happen to match an alternative
+    # style. In other cases, it won't match any style at all
+    expect(cop.config_to_allow_offenses).to(
+      eq('Enabled' => false).or(
+        satisfy { |h| other_styles.include?(h['AlignWith']) }))
+  end
+
+  it "auto-corrects mismatched #{name} ... end" do
+    aligned_source = ["#{prefix}#{alignment_base} #{arg}",
+                      "#{' ' * prefix.length}#{end_kw.strip}"].join("\n")
+    corrected = autocorrect_source(cop, source)
+    expect(corrected).to eq(aligned_source)
   end
 end
 
 shared_examples_for 'aligned' do |alignment_base, arg, end_kw, name|
   name ||= alignment_base
+  name = name.gsub(/\n/, ' <newline>')
   it "accepts matching #{name} ... end" do
     inspect_source(cop, ["#{alignment_base} #{arg}",
                          end_kw])
+    expect(cop.offenses).to be_empty
+  end
+end
+
+shared_examples_for 'debugger' do |name, src|
+  it "reports an offense for a #{name} call" do
+    inspect_source(cop, src)
+    src = [src] if src.is_a? String
+    expect(cop.offenses.size).to eq(src.size)
+    expect(cop.messages)
+      .to eq(src.map { |s| "Remove debugger entry point `#{s}`." })
+    expect(cop.highlights).to eq(src)
+  end
+
+  it "can autocorrect a #{name} call" do
+    lines = src.is_a?(String) ? src : src.join("\n")
+    new_source = autocorrect_source(cop, ['def a',
+                                          "  #{lines}",
+                                          'end'].join("\n"))
+    expect(new_source).to eq("def a\nend")
+  end
+end
+
+shared_examples_for 'non-debugger' do |name, src|
+  it "does not report an offense for #{name}" do
+    inspect_source(cop, src)
     expect(cop.offenses).to be_empty
   end
 end

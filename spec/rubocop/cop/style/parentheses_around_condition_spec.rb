@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -87,8 +88,8 @@ describe RuboCop::Cop::Style::ParenthesesAroundCondition, :config do
     expect(cop.offenses).to be_empty
   end
 
-  it 'is not confused by leading parenthesis in subexpression' do
-    inspect_source(cop, ['(a > b) && other ? one : two'])
+  it 'is not confused by leading parentheses in subexpression' do
+    inspect_source(cop, '(a > b) && other ? one : two')
     expect(cop.offenses).to be_empty
   end
 
@@ -107,14 +108,22 @@ describe RuboCop::Cop::Style::ParenthesesAroundCondition, :config do
   end
 
   it 'does not blow up when the condition is a ternary op' do
-    inspect_source(cop, ['x if (a ? b : c)'])
+    inspect_source(cop, 'x if (a ? b : c)')
     expect(cop.offenses.size).to eq(1)
   end
 
   context 'safe assignment is allowed' do
-    it 'accepts = in condition surrounded with parentheses' do
+    it 'accepts variable assignment in condition surrounded with parentheses' do
       inspect_source(cop,
                      ['if (test = 10)',
+                      'end'
+                     ])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'accepts element assignment in condition surrounded with parentheses' do
+      inspect_source(cop,
+                     ['if (test[0] = 10)',
                       'end'
                      ])
       expect(cop.offenses).to be_empty
@@ -132,9 +141,19 @@ describe RuboCop::Cop::Style::ParenthesesAroundCondition, :config do
   context 'safe assignment is not allowed' do
     let(:cop_config) { { 'AllowSafeAssignment' => false } }
 
-    it 'does not accept = in condition surrounded with parentheses' do
+    it 'does not accept variable assignment in condition surrounded with ' \
+       'parentheses' do
       inspect_source(cop,
                      ['if (test = 10)',
+                      'end'
+                     ])
+      expect(cop.offenses.size).to eq(1)
+    end
+
+    it 'does not accept element assignment in condition surrounded with ' \
+       'parentheses' do
+      inspect_source(cop,
+                     ['if (test[0] = 10)',
                       'end'
                      ])
       expect(cop.offenses.size).to eq(1)

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,27 +10,35 @@ module RuboCop
       #
       #   "result is #{10}"
       class LiteralInInterpolation < Cop
-        LITERALS = [:str, :dstr, :int, :float, :array,
-                    :hash, :regexp, :nil, :true, :false]
-
-        MSG = 'Literal interpolation detected.'
+        MSG = 'Literal interpolation detected.'.freeze
 
         def on_dstr(node)
           node.children.select { |n| n.type == :begin }.each do |begin_node|
             final_node = begin_node.children.last
             next unless final_node
-            # handle strings like __FILE__
-            return if special_string?(final_node)
-            next unless LITERALS.include?(final_node.type)
+            next if special_keyword?(final_node)
+            next if final_node.xstr_type?
+            next unless final_node.literal?
 
             add_offense(final_node, :expression)
           end
         end
 
+        def autocorrect(node)
+          value = autocorrected_value(node)
+          ->(corrector) { corrector.replace(node.parent.source_range, value) }
+        end
+
         private
 
-        def special_string?(node)
-          node.type == :str && !node.loc.respond_to?(:begin)
+        def special_keyword?(node)
+          # handle strings like __FILE__
+          (node.type == :str && !node.loc.respond_to?(:begin)) ||
+            node.source_range.is?('__LINE__')
+        end
+
+        def autocorrected_value(node)
+          node.str_type? ? node.children.last : node.source
         end
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,11 +7,36 @@ module RuboCop
       # This cop looks for trivial reader/writer methods, that could
       # have been created with the attr_* family of functions automatically.
       class TrivialAccessors < Cop
-        include OnMethodDef
+        MSG = 'Use `attr_%s` to define trivial %s methods.'.freeze
 
-        MSG = 'Use `attr_%s` to define trivial %s methods.'
+        def on_def(node)
+          return if in_module_or_instance_eval?(node)
+          method_name, args, body = *node
+          on_method_def(node, method_name, args, body)
+        end
+
+        def on_defs(node)
+          return if in_module_or_instance_eval?(node)
+          return if ignore_class_methods?
+          _scope, method_name, args, body = *node
+          on_method_def(node, method_name, args, body)
+        end
 
         private
+
+        def in_module_or_instance_eval?(node)
+          node.each_ancestor(:block, :class, :sclass, :module).each do |pnode|
+            case pnode.type
+            when :class, :sclass
+              return false
+            when :module
+              return true
+            else
+              return true if pnode.method_name == :instance_eval
+            end
+          end
+          false
+        end
 
         def on_method_def(node, method_name, args, body)
           kind = if trivial_reader?(method_name, args, body)
@@ -33,6 +59,10 @@ module RuboCop
 
         def allow_dsl_writers?
           cop_config['AllowDSLWriters']
+        end
+
+        def ignore_class_methods?
+          cop_config['IgnoreClassMethods']
         end
 
         def whitelist
@@ -65,7 +95,8 @@ module RuboCop
         end
 
         def looks_like_trivial_writer?(args, body)
-          args.children.size == 1 && args.children[0].type != :restarg &&
+          args.children.size == 1 &&
+            ![:restarg, :blockarg].include?(args.children[0].type) &&
             body && body.type == :ivasgn &&
             body.children[1] && body.children[1].type == :lvar
         end
@@ -86,7 +117,7 @@ module RuboCop
         def names_match?(method_name, body)
           ivar_name, = *body
 
-          method_name.to_s.chomp('=') == ivar_name[1..-1]
+          method_name.to_s.sub(/[=?]$/, '') == ivar_name[1..-1]
         end
 
         def trivial_accessor_kind(method_name, args, body)
@@ -112,26 +143,28 @@ module RuboCop
 
         def autocorrect_instance(node)
           method_name, args, body = *node
-          return unless names_match?(method_name, body)
-          return unless (kind = trivial_accessor_kind(method_name, args, body))
+          unless names_match?(method_name, body) &&
+                 !predicate?(method_name) &&
+                 (kind = trivial_accessor_kind(method_name, args, body))
+            return
+          end
 
-          @corrections << lambda do |corrector|
-            corrector.replace(
-              node.loc.expression,
-              accessor(kind, method_name)
-            )
+          lambda do |corrector|
+            corrector.replace(node.source_range, accessor(kind, method_name))
           end
         end
 
         def autocorrect_class(node)
           _, method_name, args, body = *node
-          return unless names_match?(method_name, body)
-          return unless (kind = trivial_accessor_kind(method_name, args, body))
+          unless names_match?(method_name, body) &&
+                 (kind = trivial_accessor_kind(method_name, args, body))
+            return
+          end
 
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             indent = ' ' * node.loc.column
             corrector.replace(
-              node.loc.expression,
+              node.source_range,
               ['class << self',
                "#{indent}  #{accessor(kind, method_name)}",
                "#{indent}end"].join("\n")

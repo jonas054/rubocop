@@ -1,21 +1,27 @@
 # encoding: utf-8
+# frozen_string_literal: true
+
+require 'set'
 
 module RuboCop
   module Cop
     module Style
       # This cops checks for two or more consecutive blank lines.
       class EmptyLines < Cop
-        MSG = 'Extra blank line detected.'
+        MSG = 'Extra blank line detected.'.freeze
         LINE_OFFSET = 2
 
         def investigate(processed_source)
           return if processed_source.tokens.empty?
 
+          lines = Set.new
+          processed_source.tokens.each do |token|
+            lines << token.pos.line
+          end
+
           prev_line = 1
 
-          processed_source.tokens.sort_by { |t| t.pos.line }.each do |token|
-            cur_line = token.pos.line
-
+          lines.sort.each do |cur_line|
             line_diff = cur_line - prev_line
 
             if line_diff > LINE_OFFSET
@@ -36,7 +42,7 @@ module RuboCop
         end
 
         def autocorrect(range)
-          @corrections << ->(corrector) { corrector.remove(range) }
+          ->(corrector) { corrector.remove(range) }
         end
       end
     end

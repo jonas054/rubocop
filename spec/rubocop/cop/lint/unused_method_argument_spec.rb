@@ -1,9 +1,13 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
-describe RuboCop::Cop::Lint::UnusedMethodArgument do
-  subject(:cop) { described_class.new }
+describe RuboCop::Cop::Lint::UnusedMethodArgument, :config do
+  subject(:cop) { described_class.new(config) }
+  let(:cop_config) do
+    { 'AllowUnusedKeywordArguments' => false, 'IgnoreEmptyMethods' => false }
+  end
 
   describe 'inspection' do
     before do
@@ -76,6 +80,14 @@ describe RuboCop::Cop::Lint::UnusedMethodArgument do
         expect(cop.highlights).to eq(['bar'])
         expect(cop.offenses.first.message)
           .to eq('Unused method argument - `bar`.')
+      end
+
+      context 'and AllowUnusedKeywordArguments set' do
+        let(:cop_config) { { 'AllowUnusedKeywordArguments' => true } }
+
+        it 'does not care' do
+          expect(cop.offenses).to be_empty
+        end
       end
     end
 
@@ -168,6 +180,50 @@ describe RuboCop::Cop::Lint::UnusedMethodArgument do
         end
       end
     end
+
+    context 'in a method calling `binding` without arguments' do
+      let(:source) { <<-END }
+        def some_method(foo, bar)
+          do_something binding
+        end
+      END
+
+      it 'accepts all arguments' do
+        expect(cop.offenses).to be_empty
+      end
+
+      context 'inside another method definition' do
+        let(:source) { <<-END }
+          def some_method(foo, bar)
+            def other(a)
+              puts something(binding)
+            end
+          end
+        END
+
+        it 'registers offenses' do
+          expect(cop.offenses.size).to eq 2
+          expect(cop.offenses.first.line).to eq(1)
+          expect(cop.highlights).to eq(%w(foo bar))
+        end
+      end
+    end
+
+    context 'in a method calling `binding` with arguments' do
+      context 'when a method argument is unused' do
+        let(:source) { <<-END }
+          def some_method(foo)
+            binding(:something)
+          end
+        END
+
+        it 'registers an offense' do
+          expect(cop.offenses.size).to eq(1)
+          expect(cop.offenses.first.line).to eq(1)
+          expect(cop.highlights).to eq(['foo'])
+        end
+      end
+    end
   end
 
   describe 'auto-correction' do
@@ -245,7 +301,7 @@ describe RuboCop::Cop::Lint::UnusedMethodArgument do
       end
     end
 
-    context 'when an unsed argument has default value' do
+    context 'when an unused argument has default value' do
       let(:source) { <<-END }
         def some_method(foo, bar = 1)
           puts foo
@@ -273,6 +329,38 @@ describe RuboCop::Cop::Lint::UnusedMethodArgument do
       it 'ignores that since modifying the name changes the method interface' do
         expect(corrected_source).to eq(source)
       end
+    end
+  end
+
+  context 'when IgnoreEmptyMethods config parameter is set' do
+    let(:cop_config) { { 'IgnoreEmptyMethods' => true } }
+
+    it 'accepts an empty method with a single unused parameter' do
+      inspect_source(cop, ['def method(arg)',
+                           'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for a non-empty method with a single unused ' \
+        'parameter' do
+      inspect_source(cop, ['def method(arg)',
+                           '  1',
+                           'end'])
+      expect(cop.offenses.size).to eq 1
+    end
+
+    it 'accepts an empty method with multiple unused parameters' do
+      inspect_source(cop, ['def method(a, b, *others)',
+                           'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for a non-empty method with multiple unused ' \
+       'parameters' do
+      inspect_source(cop, ['def method(a, b, *others)',
+                           '  1',
+                           'end'])
+      expect(cop.offenses.size).to eq 3
     end
   end
 end

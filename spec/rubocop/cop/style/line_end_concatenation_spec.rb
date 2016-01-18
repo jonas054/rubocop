@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -10,12 +11,22 @@ describe RuboCop::Cop::Style::LineEndConcatenation do
                    ['top = "test" +',
                     '"top"'])
     expect(cop.offenses.size).to eq(1)
+    expect(cop.highlights).to eq(['+'])
   end
 
   it 'registers an offense for string concat with << at line end' do
     inspect_source(cop,
                    ['top = "test" <<',
                     '"top"'])
+    expect(cop.offenses.size).to eq(1)
+    expect(cop.highlights).to eq(['<<'])
+  end
+
+  it 'registers an offense for string concat with << and \ at line ends' do
+    inspect_source(cop,
+                   ['top = "test " \\',
+                    '"foo" <<',
+                    '"bar"'])
     expect(cop.offenses.size).to eq(1)
   end
 
@@ -61,13 +72,51 @@ describe RuboCop::Cop::Style::LineEndConcatenation do
 
   it 'accepts string concat on the same line' do
     inspect_source(cop,
-                   ['top = "test" + "top"'])
+                   'top = "test" + "top"')
+    expect(cop.offenses).to be_empty
+  end
+
+  it 'accepts string concat with a return value of method on a string' do
+    inspect_source(cop,
+                   [
+                     # What we want here is 'content   ', not '
+                     # content content content '.
+                     'content_and_three_spaces = "content" +',
+                     '  " " * 3',
+                     # Method call with dot on a string literal.
+                     "a_thing = 'a ' +",
+                     "  'gniht'.reverse",
+                     # Formatting operator.
+                     "output = 'value: ' +",
+                     "  '%d' % value",
+                     # Index operator.
+                     "'letter: ' +",
+                     "  'abcdefghij'[ix]"
+                   ])
+    expect(cop.offenses).to be_empty
+  end
+
+  it 'accepts string concat with a return value of method on an interpolated ' \
+     'string' do
+    source = <<-END
+      x3a = 'x' +
+        "\#{'a' + "\#{3}"}".reverse
+    END
+    inspect_source(cop, source)
     expect(cop.offenses).to be_empty
   end
 
   it 'accepts string concat at line end when followed by comment' do
     inspect_source(cop,
                    ['top = "test" + # something',
+                    '"top"'])
+    expect(cop.offenses).to be_empty
+  end
+
+  it 'accepts string concat at line end when followed by a comment line' do
+    inspect_source(cop,
+                   ['top = "test" +',
+                    '# something',
                     '"top"'])
     expect(cop.offenses).to be_empty
   end
@@ -100,6 +149,16 @@ describe RuboCop::Cop::Style::LineEndConcatenation do
   it 'autocorrects in the simple case by replacing + with \\' do
     corrected = autocorrect_source(cop,
                                    ['top = "test" +',
+                                    '"top"'])
+    expect(corrected).to eq ['top = "test" \\', '"top"'].join("\n")
+  end
+
+  # The "central auto-correction engine" can't handle intermediate states where
+  # the code has syntax errors, so it's important to fix the trailing
+  # whitespace in this cop.
+  it 'autocorrects a + with trailing whitespace to \\' do
+    corrected = autocorrect_source(cop,
+                                   ['top = "test" + ',
                                     '"top"'])
     expect(corrected).to eq ['top = "test" \\', '"top"'].join("\n")
   end

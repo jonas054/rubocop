@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop checks for missing space between a token and a comment on the
       # same line.
       class SpaceBeforeComment < Cop
-        MSG = 'Put a space before an end-of-line comment.'
+        MSG = 'Put a space before an end-of-line comment.'.freeze
 
         def investigate(processed_source)
           processed_source.tokens.each_cons(2) do |t1, t2|
@@ -19,9 +20,7 @@ module RuboCop
         private
 
         def autocorrect(range)
-          @corrections << lambda do |corrector|
-            corrector.insert_before(range, ' ')
-          end
+          ->(corrector) { corrector.insert_before(range, ' ') }
         end
       end
     end

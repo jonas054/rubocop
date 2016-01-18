@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -80,9 +81,9 @@ module RuboCop
           case branch_point_node.type
           when :if                     then if_body_name
           when :case                   then case_body_name
-          when *LOGICAL_OPERATOR_TYPES then logical_operator_body_name
           when RESCUE_TYPE             then rescue_body_name
           when ENSURE_TYPE             then ensure_body_name
+          when *LOGICAL_OPERATOR_TYPES then logical_operator_body_name
           else fail InvalidBranchBodyError
           end
         rescue InvalidBranchBodyError
@@ -133,7 +134,7 @@ module RuboCop
         end
 
         def body_index
-          branch_point_node.children.index(branch_body_node)
+          branch_point_node.children.index { |n| n.equal?(branch_body_node) }
         end
 
         def set_branch_point_and_body_nodes!
@@ -157,14 +158,14 @@ module RuboCop
           child_index = parent_node.children.index(child_node)
 
           case parent_node.type
-          when *BRANCH_TYPES
-            child_index != CONDITION_INDEX_OF_BRANCH_NODE
-          when *LOGICAL_OPERATOR_TYPES
-            child_index != LEFT_SIDE_INDEX_OF_LOGICAL_OPERATOR_NODE
           when RESCUE_TYPE
             true
           when ENSURE_TYPE
             child_index != ENSURE_INDEX_OF_ENSURE_NODE
+          when *BRANCH_TYPES
+            child_index != CONDITION_INDEX_OF_BRANCH_NODE
+          when *LOGICAL_OPERATOR_TYPES
+            child_index != LEFT_SIDE_INDEX_OF_LOGICAL_OPERATOR_NODE
           else
             false
           end

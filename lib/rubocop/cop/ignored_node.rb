@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
 
       def part_of_ignored_node?(node)
         ignored_nodes.map(&:loc).any? do |ignored_loc|
-          if ignored_loc.expression.begin_pos > node.loc.expression.begin_pos
+          if ignored_loc.expression.begin_pos > node.source_range.begin_pos
             next false
           end
 
@@ -19,7 +20,7 @@ module RuboCop
                             else
                               ignored_loc.expression.end_pos
                             end
-          ignored_end_pos >= node.loc.expression.end_pos
+          ignored_end_pos >= node.source_range.end_pos
         end
       end
 

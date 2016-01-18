@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -206,6 +207,13 @@ describe RuboCop::Cop::VariableForce::VariableTable do
           end
         end
       end
+    end
+  end
+
+  describe '#find_variable with an empty scope stack' do
+    it 'returns nil' do
+      found_variable = variable_table.find_variable(:unknown)
+      expect(found_variable).to be_nil
     end
   end
 

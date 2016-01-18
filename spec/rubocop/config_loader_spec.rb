@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -195,6 +196,7 @@ describe RuboCop::ConfigLoader do
               'https://github.com/bbatsov/ruby-style-guide#80-character-limits',
               'Enabled' => true,
               'Max' => 77,
+              'AllowHeredoc' => true,
               'AllowURI' => true,
               'URISchemes' => %w(http https)
             },
@@ -246,6 +248,115 @@ describe RuboCop::ConfigLoader do
           .to be_superset(expected.to_set)
       end
     end
+
+    context 'when a file inherits from an expanded path' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        create_file('~/.rubocop.yml', [''])
+        create_file(file_path, ['inherit_from: ~/.rubocop.yml'])
+      end
+
+      it 'does not fail to load expanded path' do
+        expect { configuration_from_file }.not_to raise_error
+      end
+    end
+
+    context 'when a file inherits from an unknown gem' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        create_file(file_path,
+                    ['inherit_gem:',
+                     '  not_a_real_gem: config/rubocop.yml'
+                    ])
+      end
+
+      it 'fails to load' do
+        expect { configuration_from_file }.to raise_error(Gem::LoadError)
+      end
+    end
+
+    context 'when a file inherits from the rubocop gem' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        create_file(file_path,
+                    ['inherit_gem:',
+                     '  rubocop: config/default.yml'
+                    ])
+      end
+
+      it 'fails to load' do
+        expect { configuration_from_file }.to raise_error(ArgumentError)
+      end
+    end
+
+    context 'when a file inherits from a known gem' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        create_file('somegemname/config/rubocop.yml',
+                    ['Metrics/MethodLength:',
+                     '  Enabled: false',
+                     '  Max: 200',
+                     '  CountComments: false'
+                    ])
+        create_file('local.yml',
+                    ['Metrics/MethodLength:',
+                     '  CountComments: true'
+                    ])
+        create_file(file_path,
+                    ['inherit_gem:',
+                     '  somegemname: config/rubocop.yml',
+                     '',
+                     'inherit_from: local.yml',
+                     '',
+                     'Metrics/MethodLength:',
+                     '  Enabled: true'
+                    ])
+      end
+
+      it 'returns values from the gem config with local overrides' do
+        mock_spec = Struct.new(:gem_dir).new('somegemname')
+        expect(Gem::Specification).to receive(:find_by_name)
+          .at_least(:once).with('somegemname').and_return(mock_spec)
+
+        expected = { 'Enabled' => true,        # overridden in .rubocop.yml
+                     'CountComments' => true,  # overridden in local.yml
+                     'Max' => 200 }            # inherited from somegem
+        expect(configuration_from_file['Metrics/MethodLength'].to_set)
+          .to be_superset(expected.to_set)
+      end
+    end
+
+    context 'when a file inherits from a url' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        stub_request(:get, /example.com/)
+          .to_return(status: 200, body: "Style/Encoding:\n    Enabled: true")
+
+        create_file('~/.rubocop.yml', [''])
+        create_file(file_path, ['inherit_from: http://example.com/rubocop.yml'])
+      end
+
+      it 'does not fail to load the resulting path' do
+        expect { configuration_from_file }.not_to raise_error
+      end
+    end
+
+    context 'when a file inherits from a non http/https url' do
+      let(:file_path) { '.rubocop.yml' }
+
+      before do
+        create_file(file_path, ['inherit_from: c:\\\\foo\\bar.yml'])
+      end
+
+      it 'fails to load the resulting path' do
+        expect { configuration_from_file }.to raise_error(Errno::ENOENT)
+      end
+    end
   end
 
   describe '.load_file', :isolated_environment do
@@ -257,12 +368,19 @@ describe RuboCop::ConfigLoader do
 
     it 'returns a configuration loaded from the passed path' do
       create_file(configuration_path, [
-        'Style/Encoding:',
-        '  Enabled: true'
-      ])
+                    'Style/Encoding:',
+                    '  Enabled: true'
+                  ])
       configuration = load_file
       expect(configuration['Style/Encoding']).to eq(
         'Enabled' => true
+      )
+    end
+
+    it 'fails with a TypeError when loading a malformed configuration file' do
+      create_file(configuration_path, 'This string is not a YAML hash')
+      expect { load_file }.to raise_error(
+        TypeError, /^Malformed configuration in .*\.rubocop\.yml$/
       )
     end
 
@@ -270,6 +388,37 @@ describe RuboCop::ConfigLoader do
       create_file(configuration_path, '')
       configuration = load_file
       expect(configuration).to eq({})
+    end
+
+    context 'when SafeYAML is required' do
+      before do
+        create_file(configuration_path, [
+                      'Style/WordArray:',
+                      "  WordRegex: !ruby/regexp '/\\A[\\p{Word}]+\\z/'"
+                    ])
+      end
+
+      context 'when it is fully required' do
+        it 'de-serializes Regexp class' do
+          in_its_own_process_with('safe_yaml') do
+            configuration = described_class.load_file('.rubocop.yml')
+
+            word_regexp = configuration['Style/WordArray']['WordRegex']
+            expect(word_regexp).to be_a(::Regexp)
+          end
+        end
+      end
+
+      context 'when safe_yaml is required without monkey patching' do
+        it 'de-serializes Regexp class' do
+          in_its_own_process_with('safe_yaml/load') do
+            configuration = described_class.load_file('.rubocop.yml')
+
+            word_regexp = configuration['Style/WordArray']['WordRegex']
+            expect(word_regexp).to be_a(::Regexp)
+          end
+        end
+      end
     end
   end
 
@@ -311,9 +460,9 @@ describe RuboCop::ConfigLoader do
     context 'when a config file which does not mention SymbolArray exists' do
       it 'is disabled' do
         create_file('.rubocop.yml', [
-          'Metrics/LineLength:',
-          '  Max: 80'
-        ])
+                      'Metrics/LineLength:',
+                      '  Max: 80'
+                    ])
         expect(config.cop_enabled?('Style/SymbolArray')).to be_falsey
       end
     end
@@ -321,9 +470,9 @@ describe RuboCop::ConfigLoader do
     context 'when a config file which explicitly enables SymbolArray exists' do
       it 'is enabled' do
         create_file('.rubocop.yml', [
-          'Style/SymbolArray:',
-          '  Enabled: true'
-        ])
+                      'Style/SymbolArray:',
+                      '  Enabled: true'
+                    ])
         expect(config.cop_enabled?('Style/SymbolArray')).to be_truthy
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,6 +9,7 @@ module RuboCop
       #
       # It will register a separate offense for each misaligned *when*.
       class CaseIndentation < Cop
+        include AutocorrectAlignment
         include ConfigurableEnforcedStyle
 
         def on_case(case_node)
@@ -50,10 +52,6 @@ module RuboCop
           end
         end
 
-        def configured_indentation_width
-          config.for_cop('IndentationWidth')['Width']
-        end
-
         def parameter_name
           'IndentWhenRelativeTo'
         end
@@ -63,6 +61,23 @@ module RuboCop
           when :case then case_node.location.keyword.column
           when :end  then case_node.location.end.column
           end
+        end
+
+        def autocorrect(node)
+          when_column = node.location.keyword.column
+          source_buffer = node.source_range.source_buffer
+          begin_pos = node.loc.keyword.begin_pos
+          whitespace = Parser::Source::Range.new(source_buffer,
+                                                 begin_pos - when_column,
+                                                 begin_pos)
+          return false unless whitespace.source.strip.empty?
+
+          case_node = node.each_ancestor(:case).first
+          base_type = cop_config[parameter_name] == 'end' ? :end : :case
+          column = base_column(case_node, base_type)
+          column += configured_indentation_width if cop_config['IndentOneStep']
+
+          ->(corrector) { corrector.replace(whitespace, ' ' * column) }
         end
       end
     end

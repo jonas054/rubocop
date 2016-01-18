@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -9,7 +10,7 @@ describe RuboCop::Cop::Style::StringLiteralsInInterpolation, :config do
     let(:cop_config) { { 'EnforcedStyle' => 'single_quotes' } }
 
     it 'registers an offense for double quotes within embedded expression' do
-      src = ['"#{"A"}"']
+      src = '"#{"A"}"'
       inspect_source(cop, src)
       expect(cop.messages)
         .to eq(['Prefer single-quoted strings inside interpolations.'])
@@ -26,7 +27,7 @@ describe RuboCop::Cop::Style::StringLiteralsInInterpolation, :config do
     end
 
     it 'accepts double quotes on a static string' do
-      src = ['"A"']
+      src = '"A"'
       inspect_source(cop, src)
       expect(cop.offenses).to be_empty
     end
@@ -92,7 +93,7 @@ describe RuboCop::Cop::Style::StringLiteralsInInterpolation, :config do
     let(:cop_config) { { 'EnforcedStyle' => 'other' } }
 
     it 'fails' do
-      expect { inspect_source(cop, ['a = "#{"b"}"']) }
+      expect { inspect_source(cop, 'a = "#{"b"}"') }
         .to raise_error(RuntimeError)
     end
   end

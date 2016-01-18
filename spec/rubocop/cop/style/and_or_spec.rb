@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -13,8 +14,7 @@ describe RuboCop::Cop::Style::AndOr, :config do
 
     %w(and or).each do |operator|
       it "accepts \"#{operator}\" outside of conditional" do
-        inspect_source(cop,
-                       ["x = a + b #{operator} return x"])
+        inspect_source(cop, "x = a + b #{operator} return x")
         expect(cop.offenses).to be_empty
       end
 
@@ -51,14 +51,12 @@ describe RuboCop::Cop::Style::AndOr, :config do
 
     %w(&& ||).each do |operator|
       it "accepts #{operator} inside of conditional" do
-        inspect_source(cop,
-                       ["test if a #{operator} b"])
+        inspect_source(cop, "test if a #{operator} b")
         expect(cop.offenses).to be_empty
       end
 
       it "accepts #{operator} outside of conditional" do
-        inspect_source(cop,
-                       ["x = a #{operator} b"])
+        inspect_source(cop, "x = a #{operator} b")
         expect(cop.offenses).to be_empty
       end
     end
@@ -73,28 +71,24 @@ describe RuboCop::Cop::Style::AndOr, :config do
     let(:cop_config) { cop_config }
 
     it 'registers an offense for "or"' do
-      inspect_source(cop,
-                     ['test if a or b'])
+      inspect_source(cop, 'test if a or b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
 
     it 'registers an offense for "and"' do
-      inspect_source(cop,
-                     ['test if a and b'])
+      inspect_source(cop, 'test if a and b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `&&` instead of `and`.'])
     end
 
     it 'accepts ||' do
-      inspect_source(cop,
-                     ['test if a || b'])
+      inspect_source(cop, 'test if a || b')
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts &&' do
-      inspect_source(cop,
-                     ['test if a && b'])
+      inspect_source(cop, 'test if a && b')
       expect(cop.offenses).to be_empty
     end
 
@@ -119,70 +113,68 @@ describe RuboCop::Cop::Style::AndOr, :config do
                                 'end'].join("\n"))
     end
 
-    it 'leaves *or* as is if auto-correction changes the meaning' do
+    it 'autocorrects "or" with an assignment on the left' do
       src = "x = y or teststring.include? 'b'"
       new_source = autocorrect_source(cop, src)
-      expect(new_source).to eq(src)
+      expect(new_source).to eq("(x = y) || teststring.include?('b')")
     end
 
-    it 'leaves *and* as is if auto-correction changes the meaning' do
+    it 'autocorrects "or" with an assignment on the right' do
+      src = "teststring.include? 'b' or x = y"
+      new_source = autocorrect_source(cop, src)
+      expect(new_source).to eq("teststring.include?('b') || (x = y)")
+    end
+
+    it 'autocorrects "and" with an assignment and return on either side' do
       src = 'x = a + b and return x'
       new_source = autocorrect_source(cop, src)
-      expect(new_source).to eq(src)
+      expect(new_source).to eq('(x = a + b) && (return x)')
     end
 
     it 'warns on short-circuit (and)' do
-      inspect_source(cop,
-                     ['x = a + b and return x'])
+      inspect_source(cop, 'x = a + b and return x')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `&&` instead of `and`.'])
     end
 
     it 'also warns on non short-circuit (and)' do
-      inspect_source(cop,
-                     ['x = a + b if a and b'])
+      inspect_source(cop, 'x = a + b if a and b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `&&` instead of `and`.'])
     end
 
     it 'also warns on non short-circuit (and) (unless)' do
-      inspect_source(cop,
-                     ['x = a + b unless a and b'])
+      inspect_source(cop, 'x = a + b unless a and b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `&&` instead of `and`.'])
     end
 
     it 'warns on short-circuit (or)' do
-      inspect_source(cop,
-                     ['x = a + b or return x'])
+      inspect_source(cop, 'x = a + b or return x')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
 
     it 'also warns on non short-circuit (or)' do
-      inspect_source(cop,
-                     ['x = a + b if a or b'])
+      inspect_source(cop, 'x = a + b if a or b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
 
     it 'also warns on non short-circuit (or) (unless)' do
-      inspect_source(cop,
-                     ['x = a + b unless a or b'])
+      inspect_source(cop, 'x = a + b unless a or b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
 
     it 'also warns on while (or)' do
-      inspect_source(cop,
-                     ['x = a + b while a or b'])
+      inspect_source(cop, 'x = a + b while a or b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
 
     it 'also warns on until (or)' do
-      inspect_source(cop,
-                     ['x = a + b until a or b'])
+      inspect_source(cop, 'x = a + b until a or b')
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Use `||` instead of `or`.'])
     end
@@ -207,12 +199,12 @@ describe RuboCop::Cop::Style::AndOr, :config do
       expect(new_source).to eq('obj.method(a,b) || b')
     end
 
-    it 'auto-corrects "or" with || and doesn\'t add extra parenthesis' do
+    it 'auto-corrects "or" with || and doesn\'t add extra parentheses' do
       new_source = autocorrect_source(cop, 'method(a, b) or b')
       expect(new_source).to eq('method(a, b) || b')
     end
 
-    it 'auto-corrects "or" with || and add parenthesis on left expr' do
+    it 'auto-corrects "or" with || and adds parentheses to expr' do
       new_source = autocorrect_source(cop, 'b or method a,b')
       expect(new_source).to eq('b || method(a,b)')
     end
@@ -237,14 +229,95 @@ describe RuboCop::Cop::Style::AndOr, :config do
       expect(new_source).to eq('obj.method(a,b) && b')
     end
 
-    it 'auto-corrects "and" with && and doesn\'t add extra parenthesis' do
+    it 'auto-corrects "and" with && and doesn\'t add extra parentheses' do
       new_source = autocorrect_source(cop, 'method(a, b) and b')
       expect(new_source).to eq('method(a, b) && b')
     end
 
-    it 'auto-corrects "and" with && and add parenthesis on left expr' do
+    it 'auto-corrects "and" with && and adds parentheses to expr' do
       new_source = autocorrect_source(cop, 'b and method a,b')
       expect(new_source).to eq('b && method(a,b)')
+    end
+
+    context 'with !obj.method arg on right' do
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, 'x and !obj.method arg')
+        expect(new_source).to eq('x && !obj.method(arg)')
+      end
+    end
+
+    context 'with !obj.method arg on left' do
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, '!obj.method arg and x')
+        expect(new_source).to eq('!obj.method(arg) && x')
+      end
+    end
+
+    context 'with `not` expression on right' do
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, 'x and not arg')
+        expect(new_source).to eq('x && (not arg)')
+      end
+    end
+
+    context 'with `not` expression on left' do
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, 'not arg and x')
+        expect(new_source).to eq('(not arg) && x')
+      end
+    end
+
+    context 'with !variable on left' do
+      it "doesn't crash and burn" do
+        # regression test; see GH issue 2482
+        inspect_source(cop, '!var or var.empty?')
+        expect(cop.offenses.size).to eq(1)
+      end
+    end
+
+    context 'within a nested begin node' do
+      # regression test; see GH issue 2531
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, ['def x',
+                                              'end',
+                                              '',
+                                              'def y',
+                                              '  a = b and a.c',
+                                              'end'])
+        expect(new_source).to eq(['def x',
+                                  'end',
+                                  '',
+                                  'def y',
+                                  '  (a = b) && a.c',
+                                  'end'].join("\n"))
+      end
+    end
+
+    context 'within a nested begin node with one child only' do
+      # regression test; see GH issue 2531
+      it 'autocorrects "and" with && and adds parens' do
+        new_source = autocorrect_source(cop, ['(def y',
+                                              '  a = b and a.c',
+                                              'end)'])
+        expect(new_source).to eq(['(def y',
+                                  '  (a = b) && a.c',
+                                  'end)'].join("\n"))
+      end
+    end
+
+    context 'with a file which contains __FILE__' do
+      let(:source) do
+        ["APP_ROOT = Pathname.new File.expand_path('../../', __FILE__)",
+         "system('bundle check') or system!('bundle install')"]
+      end
+
+      # regression test; see GH issue 2609
+      it 'autocorrects "or" with ||' do
+        new_source = autocorrect_source(cop, source)
+        expect(new_source).to eq(
+          ["APP_ROOT = Pathname.new File.expand_path('../../', __FILE__)",
+           "system('bundle check') || system!('bundle install')"].join("\n"))
+      end
     end
   end
 end

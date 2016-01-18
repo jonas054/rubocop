@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,9 +9,9 @@ module RuboCop
         include AutocorrectUnlessChangingAST
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `%s` instead of `%s`.'
+        MSG = 'Use `%s` instead of `%s`.'.freeze
 
-        OPS = { 'and' => '&&', 'or' => '||' }
+        OPS = { 'and' => '&&', 'or' => '||' }.freeze
 
         def on_and(node)
           process_logical_op(node) if style == :always
@@ -63,25 +64,55 @@ module RuboCop
           replacement = (node.type == :and ? '&&' : '||')
           lambda do |corrector|
             [expr1, expr2].each do |expr|
-              _receiver, _method_name, *args = *expr
-              next unless correctable?(expr)
-
-              sb = expr.loc.expression.source_buffer
-              begin_paren = expr.loc.selector.end_pos
-              end_paren = begin_paren + 1
-              range = Parser::Source::Range.new(sb, begin_paren, end_paren)
-              corrector.replace(range, '(')
-              corrector.insert_after(args.last.loc.expression, ')')
+              if expr.send_type?
+                correct_send(expr, corrector)
+              elsif expr.return_type?
+                correct_other(expr, corrector)
+              elsif expr.assignment?
+                correct_other(expr, corrector)
+              end
             end
             corrector.replace(node.loc.operator, replacement)
           end
         end
 
-        def correctable?(expr)
-          return false unless expr.type == :send
-          _receiver, method_name, *args = *expr
+        def correct_send(node, corrector)
+          receiver, method_name, *args = *node
+          if method_name == :!
+            # ! is a special case:
+            # 'x and !obj.method arg' can be auto-corrected if we
+            # recurse down a level and add parens to 'obj.method arg'
+            # however, 'not x' also parses as (send x :!)
+
+            if node.loc.selector.source == '!'
+              node = receiver
+              return unless node.send_type?
+              _receiver, _method_name, *args = *node
+            elsif node.loc.selector.source == 'not'
+              return correct_other(node, corrector)
+            else
+              fail 'unrecognized unary negation operator'
+            end
+          end
+          return unless correctable_send?(node)
+
+          sb = node.source_range.source_buffer
+          begin_paren = node.loc.selector.end_pos
+          range = Parser::Source::Range.new(sb, begin_paren, begin_paren + 1)
+          corrector.replace(range, '(')
+          corrector.insert_after(args.last.source_range, ')')
+        end
+
+        def correct_other(node, corrector)
+          return unless node.source_range.begin.source != '('
+          corrector.insert_before(node.source_range, '(')
+          corrector.insert_after(node.source_range, ')')
+        end
+
+        def correctable_send?(node)
+          _receiver, method_name, *args = *node
           # don't clobber if we already have a starting paren
-          return false unless !expr.loc.begin || expr.loc.begin.source != '('
+          return false unless !node.loc.begin || node.loc.begin.source != '('
           # don't touch anything unless we are sure it is a method call.
           return false unless args.last && method_name.to_s =~ /[a-z]/
 

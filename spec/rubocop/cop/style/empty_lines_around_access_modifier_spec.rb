@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -30,6 +31,51 @@ describe RuboCop::Cop::Style::EmptyLinesAroundAccessModifier do
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages)
         .to eq(["Keep a blank line before and after `#{access_modifier}`."])
+    end
+
+    it "ignores comment line before #{access_modifier}" do
+      inspect_source(cop,
+                     ['class Test',
+                      '  something',
+                      '',
+                      '  # This comment is fine',
+                      "  #{access_modifier}",
+                      '',
+                      '  def test; end',
+                      'end'])
+      expect(cop.offenses.size).to eq(0)
+    end
+
+    it "ignores #{access_modifier} inside a method call" do
+      inspect_source(cop,
+                     ['class Test',
+                      '  def #{access_modifier}?',
+                      "    #{access_modifier}",
+                      '  end',
+                      'end'])
+      expect(cop.offenses.size).to eq(0)
+    end
+
+    it "ignores #{access_modifier} deep inside a method call" do
+      inspect_source(cop,
+                     ['class Test',
+                      "  def #{access_modifier}?",
+                      '    if true',
+                      "      #{access_modifier}",
+                      '    end',
+                      '  end',
+                      'end'])
+      expect(cop.offenses.size).to eq(0)
+    end
+
+    it "ignores #{access_modifier} with a right-hand-side condition" do
+      inspect_source(cop,
+                     ['class Test',
+                      "  def #{access_modifier}?",
+                      "    #{access_modifier} if true",
+                      '  end',
+                      'end'])
+      expect(cop.offenses.size).to eq(0)
     end
 
     it "autocorrects blank line before #{access_modifier}" do
@@ -74,6 +120,52 @@ describe RuboCop::Cop::Style::EmptyLinesAroundAccessModifier do
                       '  def test; end',
                       'end'])
       expect(cop.offenses).to be_empty
+    end
+
+    context 'at the beginning of block' do
+      context 'for blocks defined with do' do
+        it 'accepts missing blank line' do
+          inspect_source(cop,
+                         ['included do',
+                          "  #{access_modifier}",
+                          '',
+                          '  def test; end',
+                          'end'])
+          expect(cop.offenses).to be_empty
+        end
+
+        it 'accepts missing blank line with arguments' do
+          inspect_source(cop,
+                         ['included do |foo|',
+                          "  #{access_modifier}",
+                          '',
+                          '  def test; end',
+                          'end'])
+          expect(cop.offenses).to be_empty
+        end
+      end
+
+      context 'for blocks defined with {}' do
+        it 'accepts missing blank line' do
+          inspect_source(cop,
+                         ['included {',
+                          "  #{access_modifier}",
+                          '',
+                          '  def test; end',
+                          '}'])
+          expect(cop.offenses).to be_empty
+        end
+
+        it 'accepts missing blank line with arguments' do
+          inspect_source(cop,
+                         ['included { |foo|',
+                          "  #{access_modifier}",
+                          '',
+                          '  def test; end',
+                          '}'])
+          expect(cop.offenses).to be_empty
+        end
+      end
     end
 
     it 'accepts missing blank line when at the end of block' do

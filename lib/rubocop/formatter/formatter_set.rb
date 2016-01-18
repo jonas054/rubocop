@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'fileutils'
 
@@ -18,15 +19,31 @@ module RuboCop
         'html'     => HTMLFormatter,
         'files'    => FileListFormatter,
         'offenses' => OffenseCountFormatter,
-        'disabled' => DisabledLinesFormatter
-      }
+        'disabled' => DisabledLinesFormatter,
+        'worst'    => WorstOffendersFormatter
+      }.freeze
 
-      FORMATTER_APIS = [:started, :file_started, :file_finished, :finished]
+      FORMATTER_APIS = [:started, :finished].freeze
 
       FORMATTER_APIS.each do |method_name|
         define_method(method_name) do |*args|
           each { |f| f.send(method_name, *args) }
         end
+      end
+
+      def initialize(options = {})
+        @options = options # CLI options
+      end
+
+      def file_started(file, options)
+        @options = options[:cli_options]
+        @config_store = options[:config_store]
+        each { |f| f.file_started(file, options) }
+      end
+
+      def file_finished(file, offenses)
+        each { |f| f.file_finished(file, offenses) }
+        offenses
       end
 
       def add_formatter(formatter_type, output_path = nil)
@@ -47,7 +64,7 @@ module RuboCop
           output = $stdout
         end
 
-        self << formatter_class.new(output)
+        self << formatter_class.new(output, @options)
       end
 
       def close_output_files

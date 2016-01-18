@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -16,11 +17,11 @@ module RuboCop
         include OnMethodDef
 
         MSG = 'Do not put a space between a method name and the opening ' \
-              'parenthesis.'
+              'parenthesis.'.freeze
 
         def on_method_def(_node, _method_name, args, _body)
           return unless args.loc.begin && args.loc.begin.is?('(')
-          expr = args.loc.expression
+          expr = args.source_range
           pos_before_left_paren = Parser::Source::Range.new(expr.source_buffer,
                                                             expr.begin_pos - 1,
                                                             expr.begin_pos)
@@ -30,9 +31,7 @@ module RuboCop
         end
 
         def autocorrect(pos_before_left_paren)
-          @corrections << lambda do |corrector|
-            corrector.remove(pos_before_left_paren)
-          end
+          ->(corrector) { corrector.remove(pos_before_left_paren) }
         end
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -14,16 +15,17 @@ module RuboCop
         def on_block(node)
           return if node.loc.begin.is?('do') # No braces.
 
-          # If braces are on separate lines, and the Blocks cop is enabled,
-          # those braces will be changed to do..end by the user or by
+          # If braces are on separate lines, and the BlockDelimiters cop is
+          # enabled, those braces will be changed to do..end by the user or by
           # auto-correct, so reporting space issues is not useful, and it
           # creates auto-correct conflicts.
-          if config.for_cop('Style/Blocks')['Enabled'] &&
-             Util.block_length(node) > 0
+          if config.for_cop('Style/BlockDelimiters')['Enabled'] &&
+             block_length(node) > 0
             return
           end
 
-          left_brace, right_brace = node.loc.begin, node.loc.end
+          left_brace = node.loc.begin
+          right_brace = node.loc.end
 
           check_inside(node, left_brace, right_brace)
         end
@@ -31,7 +33,7 @@ module RuboCop
         private
 
         def check_inside(node, left_brace, right_brace)
-          sb = node.loc.expression.source_buffer
+          sb = node.source_range.source_buffer
 
           if left_brace.end_pos == right_brace.begin_pos
             adjacent_braces(sb, left_brace, right_brace)
@@ -58,7 +60,8 @@ module RuboCop
 
         def braces_with_contents_inside(node, inner, sb)
           _method, args, _body = *node
-          left_brace, right_brace = node.loc.begin, node.loc.end
+          left_brace = node.loc.begin
+          right_brace = node.loc.end
           args_delimiter = args.loc.begin # Can be ( | or nil.
 
           if inner =~ /^\S/
@@ -80,7 +83,9 @@ module RuboCop
             if left_brace.end_pos == args_delimiter.begin_pos &&
                cop_config['SpaceBeforeBlockParameters']
               offense(sb, left_brace.begin_pos, args_delimiter.end_pos,
-                      'Space between { and | missing.')
+                      'Space between { and | missing.') do
+                opposite_style_detected
+              end
             end
           else
             # We indicate the position after the left brace. Otherwise it's
@@ -95,7 +100,9 @@ module RuboCop
           if pipe?(args_delimiter)
             unless cop_config['SpaceBeforeBlockParameters']
               offense(sb, left_brace.end_pos, args_delimiter.begin_pos,
-                      'Space between { and | detected.')
+                      'Space between { and | detected.') do
+                opposite_style_detected
+              end
             end
           else
             brace_with_space = range_with_surrounding_space(left_brace, :right)
@@ -144,7 +151,7 @@ module RuboCop
         end
 
         def autocorrect(range)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             case range.source
             when /\s/ then corrector.remove(range)
             when '{}' then corrector.replace(range, '{ }')

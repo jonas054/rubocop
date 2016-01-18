@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cops checks for class and module names with
       # an underscore in them.
       class ClassAndModuleCamelCase < Cop
-        MSG = 'Use CamelCase for classes and modules.'
+        MSG = 'Use CamelCase for classes and modules.'.freeze
 
         def on_class(node)
           check_name(node)

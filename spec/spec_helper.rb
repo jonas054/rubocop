@@ -1,10 +1,16 @@
 # encoding: utf-8
+# frozen_string_literal: true
+
+# Coverage support needs to be required *before* the RuboCop code is required!
+require 'support/coverage'
+
+require 'rubocop'
+
+require 'webmock/rspec'
 
 # Requires supporting files with custom matchers and macros, etc,
 # in ./support/ and its subdirectories.
 Dir["#{File.dirname(__FILE__)}/support/**/*.rb"].each { |f| require f }
-
-require 'rubocop'
 
 RSpec.configure do |config|
   # These two settings work together to allow you to limit a spec run
@@ -15,8 +21,7 @@ RSpec.configure do |config|
   config.run_all_when_everything_filtered = true
 
   config.order = :random
-
-  config.filter_run_excluding ruby: ->(v) { !RUBY_VERSION.start_with?(v.to_s) }
+  Kernel.srand config.seed
 
   broken_filter = lambda do |v|
     v.is_a?(Symbol) ? RUBY_ENGINE == v.to_s : v
@@ -24,13 +29,18 @@ RSpec.configure do |config|
   config.filter_run_excluding broken: broken_filter
 
   config.expect_with :rspec do |expectations|
+    expectations.include_chain_clauses_in_custom_matcher_descriptions = true
     expectations.syntax = :expect # Disable `should`
   end
 
   config.mock_with :rspec do |mocks|
     mocks.syntax = :expect # Disable `should_receive` and `stub`
+    mocks.verify_partial_doubles = true
   end
 end
 
 # Disable colors in specs
 Rainbow.enabled = false
+
+# Disable network connections
+WebMock.disable_net_connect!(allow: 'codeclimate.com')

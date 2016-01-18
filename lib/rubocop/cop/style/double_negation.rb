@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -20,24 +21,13 @@ module RuboCop
       # As you're unlikely to write code that can accept values of any type
       # this is rarely a problem in practice.
       class DoubleNegation < Cop
-        MSG = 'Avoid the use of double negation (`!!`).'
+        MSG = 'Avoid the use of double negation (`!!`).'.freeze
+
+        def_node_matcher :double_negative?, '(send (send _ :!) :!)'
 
         def on_send(node)
-          return unless not_node?(node)
-
-          receiver, _method_name, *_args = *node
-
-          add_offense(node, :selector) if not_node?(receiver)
-        end
-
-        private
-
-        def not_node?(node)
-          _receiver, method_name, *args = *node
-
-          # ! does not take any arguments
-          args.empty? && method_name == :! &&
-            node.loc.selector.is?('!')
+          return unless double_negative?(node) && node.loc.selector.is?('!')
+          add_offense(node, :selector)
         end
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -30,7 +31,7 @@ module RuboCop
       end
 
       callback_methods.each do |callback|
-        class_eval <<-EOS
+        class_eval <<-EOS, __FILE__, __LINE__
           def #{callback}(node)
             @cops.each do |cop|
               next unless cop.respond_to?(:#{callback})
@@ -46,21 +47,22 @@ module RuboCop
 
       def investigate(processed_source)
         reset_errors
+        remove_irrelevant_cops(processed_source.buffer.name)
         prepare(processed_source)
         invoke_custom_processing(@cops, processed_source)
         invoke_custom_processing(@forces, processed_source)
         process(processed_source.ast) if processed_source.ast
-        @cops.each_with_object([]) do |cop, offenses|
-          filename = processed_source.buffer.name
-          # ignore files that are of no interest to the cop in question
-          offenses.concat(cop.offenses) if cop.relevant_file?(filename)
-        end
+        @cops.flat_map(&:offenses)
       end
 
       private
 
       def reset_errors
         @errors = Hash.new { |hash, k| hash[k] = [] }
+      end
+
+      def remove_irrelevant_cops(filename)
+        @cops.reject! { |cop| cop.excluded_file?(filename) }
       end
 
       # TODO: Bad design.
@@ -76,12 +78,6 @@ module RuboCop
         cops_or_forces.each do |cop|
           next unless cop.respond_to?(:investigate)
 
-          if cop.respond_to?(:relevant_file?)
-            # ignore files that are of no interest to the cop in question
-            filename = processed_source.buffer.name
-            next unless cop.relevant_file?(filename)
-          end
-
           with_cop_error_handling(cop) do
             cop.investigate(processed_source)
           end
@@ -91,11 +87,8 @@ module RuboCop
       def with_cop_error_handling(cop)
         yield
       rescue => e
-        if @options[:raise_error]
-          raise e
-        else
-          @errors[cop] << e
-        end
+        raise e if @options[:raise_error]
+        @errors[cop] << e
       end
     end
   end

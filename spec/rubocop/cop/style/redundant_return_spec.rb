@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -72,6 +73,37 @@ describe RuboCop::Cop::Style::RedundantReturn, :config do
     expect(new_source).to eq(result_src)
   end
 
+  context 'when return has no arguments' do
+    shared_examples 'common behavior' do |ret|
+      let(:src) do
+        ['def func',
+         '  one',
+         '  two',
+         "  #{ret}",
+         '  # comment',
+         'end']
+      end
+
+      it "registers an offense for #{ret}" do
+        inspect_source(cop, src)
+        expect(cop.offenses.size).to eq(1)
+      end
+
+      it "auto-corrects by replacing #{ret} with nil" do
+        new_source = autocorrect_source(cop, src)
+        expect(new_source).to eq(['def func',
+                                  '  one',
+                                  '  two',
+                                  '  nil',
+                                  '  # comment',
+                                  'end'].join("\n"))
+      end
+    end
+
+    it_behaves_like 'common behavior', 'return'
+    it_behaves_like 'common behavior', 'return()'
+  end
+
   context 'when multi-value returns are not allowed' do
     it 'reports an offense for def with only a return' do
       src = ['def func',
@@ -115,6 +147,28 @@ describe RuboCop::Cop::Style::RedundantReturn, :config do
              'end'].join("\n")
       result_src = ['def func',
                     '  [1, 2]', # Just 1, 2 is not valid Ruby.
+                    'end'].join("\n")
+      new_source = autocorrect_source(cop, src)
+      expect(new_source).to eq(result_src)
+    end
+
+    it 'auto-corrects removes return when using an explicit hash' do
+      src = ['def func',
+             '  return {:a => 1, :b => 2}',
+             'end'].join("\n")
+      result_src = ['def func',
+                    '  {:a => 1, :b => 2}', # :a => 1, :b => 2 is not valid Ruby
+                    'end'].join("\n")
+      new_source = autocorrect_source(cop, src)
+      expect(new_source).to eq(result_src)
+    end
+
+    it 'auto-corrects by making an implicit hash explicit' do
+      src = ['def func',
+             '  return :a => 1, :b => 2',
+             'end'].join("\n")
+      result_src = ['def func',
+                    '  {:a => 1, :b => 2}', # :a => 1, :b => 2 is not valid Ruby
                     'end'].join("\n")
       new_source = autocorrect_source(cop, src)
       expect(new_source).to eq(result_src)

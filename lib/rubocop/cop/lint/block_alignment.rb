@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -12,100 +13,46 @@ module RuboCop
       #     i
       #   end
       class BlockAlignment < Cop
-        include CheckAssignment
+        MSG = '`%s` at %d, %d is not aligned with `%s` at %d, %d%s.'.freeze
 
-        MSG = '`end` at %d, %d is not aligned with `%s` at %d, %d%s'
-
-        def initialize(config = nil, options = nil)
-          super
-          @inspected_blocks = []
-        end
+        def_node_matcher :block_end_align_target?, <<-PATTERN
+          {assignment?
+           splat
+           and
+           or
+           (send _ :<<  ...)
+           (send equal?(%1) !:[] ...)}
+        PATTERN
 
         def on_block(node)
-          return if already_processed_node?(node)
-          check_block_alignment(node, node)
-        end
-
-        def on_and(node)
-          return if already_processed_node?(node)
-
-          _left, right = *node
-          return unless right.type == :block
-
-          check_block_alignment(node, right)
-          @inspected_blocks << right
-        end
-
-        alias_method :on_or, :on_and
-
-        def on_op_asgn(node)
-          variable, _op, args = *node
-          check_assignment(variable, args)
-        end
-
-        def on_send(node)
-          _receiver, _method, *args = *node
-          check_assignment(node, args.last)
-        end
-
-        def on_masgn(node)
-          variables, args = *node
-          check_assignment(variables, args)
+          check_block_alignment(start_for_block_node(node), node)
         end
 
         private
 
-        def check_assignment(begin_node, other_node)
-          return unless other_node
+        def start_for_block_node(block_node)
+          # Which node should we align the 'end' with?
+          result = block_node
 
-          block_node = find_block_node(other_node)
-          return unless block_node.type == :block
-
-          # If the block is an argument in a function call, align end with
-          # the block itself, and not with the function.
-          if begin_node.type == :send
-            _receiver, method, *_args = *begin_node
-            begin_node = block_node if method.to_s =~ /^\w+$/
+          while (parent = result.parent)
+            break if !parent || !parent.loc
+            break if parent.loc.line != block_node.loc.line &&
+                     !parent.masgn_type?
+            break unless block_end_align_target?(parent, result)
+            result = parent
           end
 
-          # Align with the expression that is on the same line
-          # where the block is defined
-          if begin_node.type != :mlhs && block_is_on_next_line?(begin_node,
-                                                                block_node)
-            return
-          end
-          return if already_processed_node?(block_node)
-
-          @inspected_blocks << block_node
-          check_block_alignment(begin_node, block_node)
-        end
-
-        def find_block_node(node)
-          while [:send, :lvasgn].include?(node.type)
-            n = case node.type
-                when :send
-                  find_block_or_send_node(node) || break
-                when :lvasgn
-                  _variable, value = *node
-                  value
-                end
-            node = n if n
-          end
-          node
-        end
-
-        def find_block_or_send_node(send_node)
-          receiver, _method, args = *send_node
-          [receiver, args].find do |subnode|
-            subnode && [:block, :send].include?(subnode.type)
-          end
+          # In offense message, we want to show the assignment LHS rather than
+          # the entire assignment
+          result, = *result while result.op_asgn_type? || result.masgn_type?
+          result
         end
 
         def check_block_alignment(start_node, block_node)
           end_loc = block_node.loc.end
           return unless begins_its_line?(end_loc)
 
-          start_loc = start_node.loc.expression
+          start_loc = start_node.source_range
           return unless start_loc.column != end_loc.column
 
           do_loc = block_node.loc.begin # Actually it's either do or {.
@@ -121,7 +68,7 @@ module RuboCop
 
           add_offense(block_node,
                       end_loc,
-                      format(MSG, end_loc.line, end_loc.column,
+                      format(MSG, end_loc.source, end_loc.line, end_loc.column,
                              start_loc.source.lines.to_a.first.chomp,
                              start_loc.line, start_loc.column,
                              alt_start_msg(match, start_loc, do_loc,
@@ -137,23 +84,12 @@ module RuboCop
           end
         end
 
-        def message
-        end
-
-        def already_processed_node?(node)
-          @inspected_blocks.include?(node)
-        end
-
-        def block_is_on_next_line?(begin_node, block_node)
-          begin_node.loc.line != block_node.loc.line
-        end
-
         def autocorrect(node)
-          key = node.children.first
-          source = node.loc.expression.source_buffer
+          ancestor_node = start_for_block_node(node)
+          source = node.source_range.source_buffer
 
-          @corrections << lambda do |corrector|
-            start_col = key.loc.expression.column
+          lambda do |corrector|
+            start_col = (ancestor_node || node).source_range.column
             starting_position_of_block_end = node.loc.end.begin_pos
             end_col = node.loc.end.column
 

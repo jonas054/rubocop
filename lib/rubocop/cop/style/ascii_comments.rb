@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop checks for non-ascii (non-English) characters
       # in comments.
       class AsciiComments < Cop
-        MSG = 'Use only ascii symbols in comments.'
+        MSG = 'Use only ascii symbols in comments.'.freeze
 
         def investigate(processed_source)
           processed_source.comments.each do |comment|

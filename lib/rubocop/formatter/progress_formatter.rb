@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Formatter
@@ -6,11 +7,19 @@ module RuboCop
     # letters for files with problems in the them. In the end it
     # appends the regular report data in the clang style format.
     class ProgressFormatter < ClangStyleFormatter
+      include TextUtil
+
+      DOT = '.'.freeze
+
+      def initialize(output, options = {})
+        super
+        @dot = green(DOT)
+      end
+
       def started(target_files)
         super
         @offenses_for_files = {}
-        file_phrase = target_files.count == 1 ? 'file' : 'files'
-        output.puts "Inspecting #{target_files.count} #{file_phrase}"
+        output.puts "Inspecting #{pluralize(target_files.size, 'file')}"
       end
 
       def file_finished(file, offenses)
@@ -35,14 +44,14 @@ module RuboCop
           end
         end
 
-        report_summary(inspected_files.count,
+        report_summary(inspected_files.size,
                        @total_offense_count,
                        @total_correction_count)
       end
 
       def report_file_as_mark(offenses)
         mark = if offenses.empty?
-                 green('.')
+                 @dot
                else
                  highest_offense = offenses.max_by(&:severity)
                  colored_severity_code(highest_offense)

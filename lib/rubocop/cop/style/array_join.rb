@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,7 +10,7 @@ module RuboCop
       # types, so we consider only cases when the first argument is an
       # array literal or the second is a string literal.
       class ArrayJoin < Cop
-        MSG = 'Favor `Array#join` over `Array#*`.'
+        MSG = 'Favor `Array#join` over `Array#*`.'.freeze
 
         def on_send(node)
           receiver_node, method_name, *arg_nodes = *node
@@ -17,6 +18,16 @@ module RuboCop
                         method_name == :* && arg_nodes[0].type == :str
 
           add_offense(node, :selector)
+        end
+
+        def autocorrect(node)
+          receiver_node, _method_name, *arg_nodes = *node
+          array = receiver_node.source
+          join_arg = arg_nodes[0].source
+
+          lambda do |corrector|
+            corrector.replace(node.source_range, "#{array}.join(#{join_arg})")
+          end
         end
       end
     end

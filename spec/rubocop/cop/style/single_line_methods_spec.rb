@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -27,6 +28,12 @@ describe RuboCop::Cop::Style::SingleLineMethods do
                            'def self.resource_class=(klass); end',
                            'def @table.columns; end'])
       expect(cop.offenses.size).to eq(3)
+    end
+
+    it 'auto-corrects an empty method' do
+      corrected = autocorrect_source(cop, 'def x; end')
+      expect(corrected).to eq(['def x; ',
+                               'end'].join("\n"))
     end
   end
 

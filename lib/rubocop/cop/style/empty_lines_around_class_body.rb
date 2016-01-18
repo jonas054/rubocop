@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -19,14 +20,16 @@ module RuboCop
       class EmptyLinesAroundClassBody < Cop
         include EmptyLinesAroundBody
 
-        KIND = 'class'
+        KIND = 'class'.freeze
 
         def on_class(node)
-          check(node)
+          _name, _superclass, body = *node
+          check(node, body)
         end
 
         def on_sclass(node)
-          check(node)
+          _obj, body = *node
+          check(node, body)
         end
       end
     end

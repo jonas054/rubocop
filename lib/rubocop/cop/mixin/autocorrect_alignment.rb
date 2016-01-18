@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,27 +7,49 @@ module RuboCop
     # the left or to the right, amount being determined by the instance
     # variable @column_delta.
     module AutocorrectAlignment
+      SPACE = ' '.freeze
+
       def configured_indentation_width
-        config.for_cop('IndentationWidth')['Width']
+        cop_config['IndentationWidth'] ||
+          config.for_cop('IndentationWidth')['Width']
+      end
+
+      def indentation(node)
+        offset(node) + (SPACE * configured_indentation_width)
+      end
+
+      def offset(node)
+        SPACE * node.loc.column
       end
 
       def check_alignment(items, base_column = nil)
         base_column ||= items.first.loc.column unless items.empty?
         prev_line = -1
         items.each do |current|
-          if current.loc.line > prev_line && start_of_line?(current.loc)
+          if current.loc.line > prev_line &&
+             begins_its_line?(current.source_range)
             @column_delta = base_column - current.loc.column
-            add_offense(current, :expression) if @column_delta != 0
+            if @column_delta != 0
+              expr = current.source_range
+              if offenses.any? { |o| within?(expr, o.location) }
+                # If this offense is within a line range that is already being
+                # realigned by autocorrect, we report the offense without
+                # autocorrecting it. Two rewrites in the same area by the same
+                # cop can not be handled. The next iteration will find the
+                # offense again and correct it.
+                add_offense(nil, expr)
+              else
+                add_offense(current, :expression)
+              end
+            end
           end
           prev_line = current.loc.line
         end
       end
 
-      def start_of_line?(loc)
-        loc.expression.source_line[0...loc.column] =~ /^\s*$/
-      end
-
       def autocorrect(arg)
+        return unless arg
+
         heredoc_ranges = heredoc_ranges(arg)
         expr = arg.respond_to?(:loc) ? arg.loc.expression : arg
 
@@ -35,9 +58,9 @@ module RuboCop
         # value of @column_delta. A local variable fixes the problem.
         column_delta = @column_delta
 
-        fail CorrectionNotPossible if block_comment_within?(expr)
+        return if block_comment_within?(expr)
 
-        @corrections << lambda do |corrector|
+        lambda do |corrector|
           each_line(expr) do |line_begin_pos|
             autocorrect_line(corrector, line_begin_pos, expr, column_delta,
                              heredoc_ranges)
@@ -50,32 +73,28 @@ module RuboCop
       def autocorrect_line(corrector, line_begin_pos, expr, column_delta,
                            heredoc_ranges)
         range = calculate_range(expr, line_begin_pos, column_delta)
-        # We must not change indentation of heredoc stings.
+        # We must not change indentation of heredoc strings.
         return if heredoc_ranges.any? { |h| within?(range, h) }
 
         if column_delta > 0
           unless range.source == "\n"
             corrector.insert_before(range, ' ' * column_delta)
           end
-        else
-          remove(range, corrector) if range.source =~ /^[ \t]+$/
+        elsif range.source =~ /\A[ \t]+\z/
+          remove(range, corrector)
         end
       end
 
       def heredoc_ranges(arg)
         return [] unless arg.is_a?(Parser::AST::Node)
 
-        heredoc_ranges = []
-        arg.each_node(:dstr) do |n|
-          if n.loc.respond_to?(:heredoc_body)
-            heredoc_ranges << n.loc.heredoc_body.join(n.loc.heredoc_end)
-          end
-        end
-        heredoc_ranges
+        arg.each_node(:dstr)
+           .select { |n| n.loc.respond_to?(:heredoc_body) }
+           .map { |n| n.loc.heredoc_body.join(n.loc.heredoc_end) }
       end
 
       def block_comment_within?(expr)
-        processed_source.comments.select(&:document?).find do |c|
+        processed_source.comments.select(&:document?).any? do |c|
           within?(c.loc.expression, expr)
         end
       end
@@ -109,11 +128,10 @@ module RuboCop
       end
 
       def each_line(expr)
-        offset = 0
+        line_begin_pos = expr.begin_pos
         expr.source.each_line do |line|
-          line_begin_pos = expr.begin_pos + offset
           yield line_begin_pos
-          offset += line.length
+          line_begin_pos += line.length
         end
       end
     end

@@ -1,11 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     # Common code for ordinary arrays with [] that can be written with %
     # syntax.
     module ArraySyntax
-      def array_of?(element_type, node)
+      def bracketed_array_of?(element_type, node)
         return false unless square_brackets?(node)
 
         array_elems = node.children

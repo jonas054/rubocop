@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -14,14 +15,14 @@ module RuboCop
       #
       # @example
       #
-      # if day.is? :tuesday && month == :jan
-      #   ...
-      # end
+      #   if day.is? :tuesday && month == :jan
+      #     ...
+      #   end
       class RequireParentheses < Cop
         include IfNode
 
         MSG = 'Use parentheses in the method call to avoid confusion about ' \
-              'precedence.'
+              'precedence.'.freeze
 
         def on_send(node)
           _receiver, method_name, *args = *node
@@ -31,23 +32,23 @@ module RuboCop
 
           if ternary_op?(args.first)
             check_ternary(args.first, node)
-          else
+          elsif predicate?(method_name)
             # We're only checking predicate methods. There would be false
             # positives otherwise.
-            check_send(args.last, node) if predicate?(method_name)
+            check_send(args.last, node)
           end
         end
 
         private
 
         def check_ternary(arg, node)
-          condition, _, _ = *arg
+          condition, = *arg
           return unless offense?(condition)
 
-          expr = node.loc.expression
+          expr = node.source_range
           range = Parser::Source::Range.new(expr.source_buffer,
                                             expr.begin_pos,
-                                            condition.loc.expression.end_pos)
+                                            condition.source_range.end_pos)
           add_offense(range, range)
         end
 

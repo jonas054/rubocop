@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -19,7 +20,14 @@ describe RuboCop::Cop::Style::AlignHash, :config do
 
     it "does not auto-correct pairs that don't start a line" do
       source = ['render :json => {:a => messages,',
-                '                 :b => :json}, :status => 404']
+                '                 :b => :json}, :status => 404',
+                'def example',
+                '  a(',
+                '    b: :c,',
+                '    d: e(',
+                '      f: g',
+                '    ), h: :i)',
+                'end']
       new_source = autocorrect_source(cop, source)
       expect(new_source).to eq(source.join("\n"))
     end
@@ -205,6 +213,29 @@ describe RuboCop::Cop::Style::AlignHash, :config do
       expect(new_sources).to eq(['hash = { a: 1, b: 2,',
                                  '         c: 3 }'].join("\n"))
     end
+
+    context 'ruby >= 2.0', :ruby20 do
+      it 'auto-corrects alignment when using double splat ' \
+         'in an explicit hash' do
+        new_source = autocorrect_source(cop, ["Hash(foo: 'bar',",
+                                              '       **extra_params',
+                                              ')'].join("\n"))
+
+        expect(new_source).to eq(["Hash(foo: 'bar',",
+                                  '     **extra_params',
+                                  ')'].join("\n"))
+      end
+
+      it 'auto-corrects alignment when using double splat in braces' do
+        new_source = autocorrect_source(cop, ["{foo: 'bar',",
+                                              '       **extra_params',
+                                              '}'].join("\n"))
+
+        expect(new_source).to eq(["{foo: 'bar',",
+                                  ' **extra_params',
+                                  '}'].join("\n"))
+      end
+    end
   end
 
   include_examples 'not on separate lines'
@@ -219,7 +250,7 @@ describe RuboCop::Cop::Style::AlignHash, :config do
 
     include_examples 'not on separate lines'
 
-    it 'accepts aligned hash keys' do
+    it 'accepts aligned hash keys and values' do
       inspect_source(cop, ['hash1 = {',
                            "  'a'   => 0,",
                            "  'bbb' => 1",
@@ -249,6 +280,25 @@ describe RuboCop::Cop::Style::AlignHash, :config do
       expect(cop.offenses).to be_empty
     end
 
+    it 'accepts hashes that use different separators' do
+      inspect_source(cop, ['hash = {',
+                           '  a: 1,',
+                           "  'bbb' => 2",
+                           '}'])
+      expect(cop.offenses).to be_empty
+    end
+
+    context 'ruby >= 2.0', :ruby20 do
+      it 'accepts hashes that use different separators and double splats' do
+        inspect_source(cop, ['hash = {',
+                             '  a: 1,',
+                             "  'bbb' => 2,",
+                             '  **foo',
+                             '}'])
+        expect(cop.offenses).to be_empty
+      end
+    end
+
     it 'registers an offense for misaligned hash values' do
       inspect_source(cop, ['hash1 = {',
                            "  'a'   =>  0,",
@@ -261,6 +311,22 @@ describe RuboCop::Cop::Style::AlignHash, :config do
                           ])
       expect(cop.highlights).to eq(["'a'   =>  0",
                                     'bbb:1'])
+    end
+
+    it 'registers an offense for misaligned hash keys' do
+      inspect_source(cop, ['hash1 = {',
+                           "  'a'   =>  0,",
+                           " 'bbb'  =>  1",
+                           '}',
+                           'hash2 = {',
+                           '   a:  0,',
+                           '  bbb: 1',
+                           '}'
+                          ])
+      expect(cop.highlights).to eq(["'a'   =>  0",
+                                    "'bbb'  =>  1",
+                                    'a:  0',
+                                    'bbb: 1'])
     end
 
     it 'registers an offense for misaligned hash rockets' do
@@ -296,7 +362,7 @@ describe RuboCop::Cop::Style::AlignHash, :config do
     end
 
     it 'accepts a single method argument entry with colon' do
-      inspect_source(cop, ['merge(parent: nil)'])
+      inspect_source(cop, 'merge(parent: nil)')
       expect(cop.offenses).to be_empty
     end
   end
@@ -358,6 +424,16 @@ describe RuboCop::Cop::Style::AlignHash, :config do
       expect(cop.offenses.size).to eq(1)
     end
 
+    context 'ruby >= 2.0', :ruby20 do
+      it 'accepts hashes with different separators' do
+        inspect_source(cop, ['{a: 1,',
+                             "  'b' => 2,",
+                             '   **params}'])
+
+        expect(cop.offenses).to be_empty
+      end
+    end
+
     include_examples 'not on separate lines'
 
     it 'auto-corrects alignment' do
@@ -373,6 +449,20 @@ describe RuboCop::Cop::Style::AlignHash, :config do
                                 'hash2 = { a => 0,',
                                 '         bb => 1,',
                                 '        ccc => 2 }'].join("\n"))
+    end
+
+    it "doesn't break code by moving long keys too far left" do
+      # regression test; see GH issue 2582
+      new_source = autocorrect_source(cop, ['{',
+                                            '  sjtjo: sjtjo,',
+                                            '  too_ono_ilitjion_tofotono_o: ' \
+                                            'too_ono_ilitjion_tofotono_o,',
+                                            '}'])
+      expect(new_source).to eq(['{',
+                                '  sjtjo: sjtjo,',
+                                'too_ono_ilitjion_tofotono_o: ' \
+                                'too_ono_ilitjion_tofotono_o,',
+                                '}'].join("\n"))
     end
   end
 

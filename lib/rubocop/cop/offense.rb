@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,8 @@ module RuboCop
       include Comparable
 
       # @api private
-      COMPARISON_ATTRIBUTES = [:line, :column, :cop_name, :message, :severity]
+      COMPARISON_ATTRIBUTES = [:line, :column, :cop_name,
+                               :message, :severity].freeze
 
       # @api public
       #
@@ -50,23 +52,39 @@ module RuboCop
       #   'LineLength'
       attr_reader :cop_name
 
+      # @api private
+      attr_reader :status
+
+      # @api private
+      def initialize(severity, location, message, cop_name,
+                     status = :uncorrected)
+        @severity = RuboCop::Cop::Severity.new(severity)
+        @location = location
+        @message = message.freeze
+        @cop_name = cop_name.freeze
+        @status = status
+        freeze
+      end
+
       # @api public
       #
       # @!attribute [r] corrected
       #
       # @return [Boolean]
       #   whether this offense is automatically corrected.
-      attr_reader :corrected
-      alias_method :corrected?, :corrected
+      def corrected
+        @status == :unsupported ? nil : @status == :corrected
+      end
+      alias corrected? corrected
 
-      # @api private
-      def initialize(severity, location, message, cop_name, corrected = false)
-        @severity = RuboCop::Cop::Severity.new(severity)
-        @location = location
-        @message = message.freeze
-        @cop_name = cop_name.freeze
-        @corrected = corrected
-        freeze
+      # @api public
+      #
+      # @!attribute [r] disabled?
+      #
+      # @return [Boolean]
+      #   whether this offense was locally disabled where it occurred
+      def disabled?
+        @status == :disabled
       end
 
       # @api private
@@ -105,7 +123,7 @@ module RuboCop
         end
       end
 
-      alias_method :eql?, :==
+      alias eql? ==
 
       def hash
         COMPARISON_ATTRIBUTES.reduce(0) do |hash, attribute|

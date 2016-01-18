@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -17,6 +18,11 @@ describe RuboCop::Cop::Lint::DeprecatedClassMethods do
     expect(cop.offenses.size).to eq(1)
     expect(cop.messages)
       .to eq(['`File.exists?` is deprecated in favor of `File.exist?`.'])
+  end
+
+  it 'does not register an offense for File.exist?' do
+    inspect_source(cop, 'File.exist?(o)')
+    expect(cop.messages).to be_empty
   end
 
   it 'registers an offense for Dir.exists?' do

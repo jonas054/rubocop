@@ -1,71 +1,30 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'optparse'
 
 module RuboCop
-  # This module contains help texts for command line options.
-  module OptionsHelp
-    TEXT = {
-      only:              'Run only the given cop(s).',
-      require:           'Require Ruby file.',
-      config:            'Specify configuration file.',
-      auto_gen_config:  ['Generate a configuration file acting as a',
-                         'TODO list.'],
-      force_exclusion:  ['Force excluding files specified in the',
-                         'configuration `Exclude` even if they are',
-                         'explicitly passed as arguments.'],
-      format:           ['Choose an output formatter. This option',
-                         'can be specified multiple times to enable',
-                         'multiple formatters at the same time.',
-                         '  [p]rogress (default)',
-                         '  [s]imple',
-                         '  [c]lang',
-                         '  [d]isabled cops via inline comments',
-                         '  [fu]ubar',
-                         '  [e]macs',
-                         '  [j]son',
-                         '  [h]tml',
-                         '  [fi]les',
-                         '  [o]ffenses',
-                         '  custom formatter class name'],
-      out:              ['Write output to a file instead of STDOUT.',
-                         'This option applies to the previously',
-                         'specified --format, or the default format',
-                         'if no format is specified.'],
-      fail_level:        'Minimum severity for exit with error code.',
-      show_cops:        ['Shows the given cops, or all cops by',
-                         'default, and their configurations for the',
-                         'current directory.'],
-      fail_fast:        ['Inspect files in order of modification',
-                         'time and stop after the first file',
-                         'containing offenses.'],
-      debug:             'Display debug info.',
-      display_cop_names: 'Display cop names in offense messages.',
-      rails:             'Run extra Rails cops.',
-      lint:              'Run only lint cops.',
-      auto_correct:      'Auto-correct offenses.',
-      no_color:          'Disable color output.',
-      version:           'Display version.',
-      verbose_version:   'Display verbose version.'
-    }
-  end
-
   # This class handles command line options.
   class Options
-    DEFAULT_FORMATTER = 'progress'
-    EXITING_OPTIONS = [:version, :verbose_version, :show_cops]
+    EXITING_OPTIONS = [:version, :verbose_version, :show_cops].freeze
+    DEFAULT_MAXIMUM_EXCLUSION_ITEMS = 15
 
     def initialize
       @options = {}
+      @validator = OptionsValidator.new(@options)
     end
 
     def parse(args)
-      ignore_dropped_options(args)
-      convert_deprecated_options(args)
-
       define_options(args).parse!(args)
+      # The --no-color CLI option sets `color: false` so we don't want the
+      # `no_color` key, which is created automatically.
+      @options.delete(:no_color)
 
-      validate_compatibility
+      @validator.validate_compatibility
+
+      if @options[:stdin] && !args.one?
+        fail ArgumentError, '-s/--stdin requires exactly one path.'
+      end
 
       [@options, args]
     end
@@ -76,12 +35,8 @@ module RuboCop
       OptionParser.new do |opts|
         opts.banner = 'Usage: rubocop [options] [file1, file2, ...]'
 
-        option(opts, '--only [COP1,COP2,...]') do |list|
-          @options[:only] = list.split(',').map do |c|
-            Cop::Cop.qualified_cop_name(c, '--only option')
-          end
-        end
-
+        add_list_options(opts)
+        add_only_options(opts)
         add_configuration_options(opts, args)
         add_formatting_options(opts)
 
@@ -93,22 +48,39 @@ module RuboCop
       end
     end
 
-    def validate_compatibility
-      return unless (incompat = @options.keys & EXITING_OPTIONS).size > 1
-      fail ArgumentError, "Incompatible cli options: #{incompat.inspect}"
+    def add_only_options(opts)
+      add_cop_selection_csv_option('except', opts)
+      add_cop_selection_csv_option('only', opts)
+      option(opts, '--only-guide-cops')
+    end
+
+    def add_cop_selection_csv_option(option, opts)
+      option(opts, "--#{option} [COP1,COP2,...]") do |list|
+        @options[:"#{option}"] =
+          if list.empty?
+            ['']
+          else
+            list.split(',').map do |c|
+              Cop::Cop.qualified_cop_name(c, "--#{option} option")
+            end
+          end
+      end
     end
 
     def add_configuration_options(opts, args)
       option(opts, '-c', '--config FILE')
 
-      option(opts, '--auto-gen-config') do
-        validate_auto_gen_config_option(args)
-        @options[:formatters] = [[DEFAULT_FORMATTER],
-                                 [Formatter::DisabledConfigFormatter,
-                                  ConfigLoader::AUTO_GENERATED_FILE]]
+      option(opts, '--auto-gen-config')
+
+      option(opts, '--exclude-limit COUNT') do
+        @validator.validate_exclude_limit_option(args)
       end
 
       option(opts, '--force-exclusion')
+
+      option(opts, '--no-offense-counts') do
+        @options[:no_offense_counts] = true
+      end
     end
 
     def add_formatting_options(opts)
@@ -118,15 +90,19 @@ module RuboCop
       end
 
       option(opts, '-o', '--out FILE') do |path|
-        @options[:formatters] ||= [[DEFAULT_FORMATTER]]
-        @options[:formatters].last << path
+        if @options[:formatters]
+          @options[:formatters].last << path
+        else
+          @options[:output_path] = path
+        end
       end
     end
 
     def add_severity_option(opts)
+      table = RuboCop::Cop::Severity::CODE_TABLE.merge(A: :autocorrect)
       option(opts, '--fail-level SEVERITY',
-             RuboCop::Cop::Severity::NAMES,
-             RuboCop::Cop::Severity::CODE_TABLE) do |severity|
+             RuboCop::Cop::Severity::NAMES + [:autocorrect],
+             table) do |severity|
         @options[:fail_level] = severity
       end
     end
@@ -139,17 +115,27 @@ module RuboCop
 
     def add_boolean_flags(opts)
       option(opts, '-F', '--fail-fast')
+      option(opts, '-C', '--cache FLAG')
       option(opts, '-d', '--debug')
       option(opts, '-D', '--display-cop-names')
+      option(opts, '-E', '--extra-details')
+      option(opts, '-S', '--display-style-guide')
       option(opts, '-R', '--rails')
-      option(opts, '-l', '--lint')
+      option(opts, '-l', '--lint') do
+        @options[:only] ||= []
+        @options[:only] << 'Lint'
+      end
       option(opts, '-a', '--auto-correct')
 
-      @options[:color] = true
-      option(opts, '-n', '--no-color') { @options[:color] = false }
+      option(opts, '-n', '--[no-]color') { |c| @options[:color] = c }
 
       option(opts, '-v', '--version')
       option(opts, '-V', '--verbose-version')
+      option(opts, '-s', '--stdin') { @options[:stdin] = $stdin.read }
+    end
+
+    def add_list_options(opts)
+      option(opts, '-L', '--list-target-files')
     end
 
     # Sets a value in the @options hash, based on the given long option and its
@@ -167,44 +153,130 @@ module RuboCop
     # e.g. [..., '--auto-correct', ...] to :auto_correct.
     def long_opt_symbol(args)
       long_opt = args.find { |arg| arg.start_with?('--') }
-      long_opt[2..-1].sub(/ .*/, '').gsub(/-/, '_').to_sym
+      long_opt[2..-1].sub(/ .*/, '').tr('-', '_').gsub(/[\[\]]/, '').to_sym
+    end
+  end
+
+  # Validates option arguments and the options' compatibility with each other.
+  class OptionsValidator
+    # Cop name validation must be done later than option parsing, so it's not
+    # called from within Options.
+    def self.validate_cop_list(names)
+      return unless names
+
+      namespaces = Cop::Cop.all.types.map { |t| t.to_s.capitalize }
+      names.each do |name|
+        next if Cop::Cop.all.any? { |c| c.cop_name == name }
+        next if namespaces.include?(name)
+        next if %w(Syntax Lint/Syntax).include?(name)
+
+        fail ArgumentError, "Unrecognized cop or namespace: #{name}."
+      end
     end
 
-    def ignore_dropped_options(args)
-      # Currently we don't make -s/--silent option raise error
-      # since those are mostly used by external tools.
-      rejected = args.reject! { |a| %w(-s --silent).include?(a) }
-      return unless rejected
-
-      warn '-s/--silent options is dropped. ' \
-           '`emacs` and `files` formatters no longer display summary.'
+    def initialize(options)
+      @options = options
     end
 
-    def convert_deprecated_options(args)
-      args.map! do |arg|
-        case arg
-        when '-e', '--emacs'
-          deprecate("#{arg} option", '--format emacs', '1.0.0')
-          %w(--format emacs)
-        else
-          arg
-        end
-      end.flatten!
+    def validate_compatibility
+      if @options.key?(:only) &&
+         (@options[:only] & %w(Lint/UnneededDisable UnneededDisable)).any?
+        fail ArgumentError, 'Lint/UnneededDisable can not be used with --only.'
+      end
+      if @options.key?(:except) &&
+         (@options[:except] & %w(Lint/Syntax Syntax)).any?
+        fail ArgumentError, 'Syntax checking can not be turned off.'
+      end
+      if @options.key?(:cache) && !%w(true false).include?(@options[:cache])
+        fail ArgumentError, '-C/--cache argument must be true or false'
+      end
+      if @options.key?(:no_offense_counts) && !@options.key?(:auto_gen_config)
+        fail ArgumentError, '--no-offense-counts can only be used together ' \
+                            'with --auto-gen-config.'
+      end
+      return if (incompat = @options.keys & Options::EXITING_OPTIONS).size <= 1
+      fail ArgumentError, "Incompatible cli options: #{incompat.inspect}"
     end
 
-    def deprecate(subject, alternative = nil, version = nil)
-      message =  "#{subject} is deprecated"
-      message << " and will be removed in RuboCop #{version}" if version
-      message << '.'
-      message << " Please use #{alternative} instead." if alternative
-      warn message
-    end
+    def validate_exclude_limit_option(args)
+      if @options[:exclude_limit] !~ /^\d+$/
+        # Emulate OptionParser's behavior to make failures consistent regardless
+        # of option order.
+        fail OptionParser::MissingArgument
+      end
 
-    def validate_auto_gen_config_option(args)
-      return unless args.any?
+      # --exclude-limit is valid if there's a parsed or yet unparsed
+      # --auto-gen-config.
+      return if @options[:auto_gen_config] || args.include?('--auto-gen-config')
 
-      warn '--auto-gen-config can not be combined with any other arguments.'
-      exit(1)
+      fail ArgumentError,
+           '--exclude-limit can only be used with --auto-gen-config.'
     end
+  end
+
+  # This module contains help texts for command line options.
+  module OptionsHelp
+    MAX_EXCL = RuboCop::Options::DEFAULT_MAXIMUM_EXCLUSION_ITEMS.to_s
+    TEXT = {
+      only:                 'Run only the given cop(s).',
+      only_guide_cops:     ['Run only cops for rules that link to a',
+                            'style guide.'],
+      except:               'Disable the given cop(s).',
+      require:              'Require Ruby file.',
+      config:               'Specify configuration file.',
+      auto_gen_config:     ['Generate a configuration file acting as a',
+                            'TODO list.'],
+      no_offense_counts:   ['Do not include offense counts in configuration',
+                            'file generated by --auto-gen-config.'],
+      exclude_limit:       ['Used together with --auto-gen-config to',
+                            'set the limit for how many Exclude',
+                            "properties to generate. Default is #{MAX_EXCL}."],
+      force_exclusion:     ['Force excluding files specified in the',
+                            'configuration `Exclude` even if they are',
+                            'explicitly passed as arguments.'],
+      format:              ['Choose an output formatter. This option',
+                            'can be specified multiple times to enable',
+                            'multiple formatters at the same time.',
+                            '  [p]rogress (default)',
+                            '  [s]imple',
+                            '  [c]lang',
+                            '  [d]isabled cops via inline comments',
+                            '  [fu]ubar',
+                            '  [e]macs',
+                            '  [j]son',
+                            '  [h]tml',
+                            '  [fi]les',
+                            '  [o]ffenses',
+                            '  [w]orst',
+                            '  custom formatter class name'],
+      out:                 ['Write output to a file instead of STDOUT.',
+                            'This option applies to the previously',
+                            'specified --format, or the default format',
+                            'if no format is specified.'],
+      fail_level:          ['Minimum severity (A/R/C/W/E/F) for exit',
+                            'with error code.'],
+      show_cops:           ['Shows the given cops, or all cops by',
+                            'default, and their configurations for the',
+                            'current directory.'],
+      fail_fast:           ['Inspect files in order of modification',
+                            'time and stop after the first file',
+                            'containing offenses.'],
+      cache:               ["Use result caching (FLAG=true) or don't",
+                            '(FLAG=false), default determined by',
+                            'configuration parameter AllCops: UseCache.'],
+      debug:                'Display debug info.',
+      display_cop_names:    'Display cop names in offense messages.',
+      display_style_guide:  'Display style guide URLs in offense messages.',
+      extra_details:        'Display extra details in offense messages.',
+      rails:                'Run extra Rails cops.',
+      lint:                 'Run only lint cops.',
+      list_target_files:    'List all files RuboCop will inspect.',
+      auto_correct:         'Auto-correct offenses.',
+      no_color:             'Force color output on or off.',
+      version:              'Display version.',
+      verbose_version:      'Display verbose version.',
+      stdin:                ['Pipe source from STDIN.',
+                             'This is useful for editor integration.']
+    }.freeze
   end
 end

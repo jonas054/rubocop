@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,7 @@ module RuboCop
       class ClassCheck < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Prefer `Object#%s` over `Object#%s`.'
+        MSG = 'Prefer `Object#%s` over `Object#%s`.'.freeze
 
         def on_send(node)
           _receiver, method_name, *_args = *node
@@ -31,7 +32,7 @@ module RuboCop
         def autocorrect(node)
           _receiver, method_name, *_args = *node
 
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             corrector.replace(node.loc.selector,
                               method_name == :is_a? ? 'kind_of?' : 'is_a?')
           end

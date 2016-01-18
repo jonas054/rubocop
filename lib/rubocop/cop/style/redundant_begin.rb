@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -27,7 +28,7 @@ module RuboCop
       class RedundantBegin < Cop
         include OnMethodDef
 
-        MSG = 'Redundant `begin` block detected.'
+        MSG = 'Redundant `begin` block detected.'.freeze
 
         def on_method_def(_node, _method_name, _args, body)
           return unless body && body.type == :kwbegin
@@ -36,20 +37,9 @@ module RuboCop
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            child = node.children.first
-
-            begin_indent = node.loc.column
-            child_indent = child.loc.column
-
-            indent_diff = child_indent - begin_indent
-
-            corrector.replace(
-              range_with_surrounding_space(node.loc.expression),
-              range_with_surrounding_space(
-                child.loc.expression
-              ).source.gsub(/^[ \t]{#{indent_diff}}/, '')
-            )
+          lambda do |corrector|
+            corrector.remove(node.loc.begin)
+            corrector.remove(node.loc.end)
           end
         end
       end

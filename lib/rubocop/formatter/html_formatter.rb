@@ -1,5 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
+require 'cgi'
 require 'erb'
 require 'ostruct'
 require 'base64'
@@ -12,9 +14,21 @@ module RuboCop
       TEMPLATE_PATH =
         File.expand_path('../../../../assets/output.html.erb', __FILE__)
 
+      Color = Struct.new(:red, :green, :blue, :alpha) do
+        def to_s
+          "rgba(#{values.join(', ')})"
+        end
+
+        def fade_out(amount)
+          dup.tap do |color|
+            color.alpha -= amount
+          end
+        end
+      end
+
       attr_reader :files, :summary
 
-      def initialize(output)
+      def initialize(output, options = {})
         super
         @files = []
         @summary = OpenStruct.new(offense_count: 0)
@@ -38,26 +52,14 @@ module RuboCop
       def render_html
         context = ERBContext.new(files, summary)
 
-        template = File.read(TEMPLATE_PATH)
+        template = File.read(TEMPLATE_PATH, encoding: Encoding::UTF_8)
         erb = ERB.new(template, nil, '-')
         html = erb.result(context.binding)
 
         output.write html
       end
 
-      Color = Struct.new(:red, :green, :blue, :alpha) do
-        def to_s
-          "rgba(#{values.join(', ')})"
-        end
-
-        def fade_out(amount)
-          dup.tap do |color|
-            color.alpha -= amount
-          end
-        end
-      end
-
-      # This class privides helper methods used in the ERB template.
+      # This class provides helper methods used in the ERB template.
       class ERBContext
         include PathUtil, TextUtil
 
@@ -67,7 +69,7 @@ module RuboCop
           warning:    Color.new(0x96, 0x28, 0xEF, 1.0),
           error:      Color.new(0xD2, 0x32, 0x2D, 1.0),
           fatal:      Color.new(0xD2, 0x32, 0x2D, 1.0)
-        }
+        }.freeze
 
         LOGO_IMAGE_PATH =
           File.expand_path('../../../../assets/logo.png', __FILE__)
@@ -101,11 +103,16 @@ module RuboCop
 
           source_line = location.source_line
 
-          source_line[0...column_range.begin] +
+          escape(source_line[0...column_range.begin]) +
             "<span class=\"highlight #{offense.severity}\">" +
-            source_line[column_range] +
+            escape(source_line[column_range]) +
             '</span>' +
-            source_line[column_range.end..-1]
+            escape(source_line[column_range.end..-1])
+        end
+
+        def escape(s)
+          # Single quotes not escaped in Ruby 1.9, so add extra substitution.
+          CGI.escapeHTML(s).gsub(/'/, '&#39;')
         end
 
         def base64_encoded_logo_image

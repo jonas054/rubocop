@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -15,6 +16,12 @@ module RuboCop
 
         def on_until(node)
           check(node)
+        end
+
+        def autocorrect(node)
+          cond, body = *node
+          oneline = "#{body.source} #{node.loc.keyword.source} " + cond.source
+          ->(corrector) { corrector.replace(node.source_range, oneline) }
         end
 
         private

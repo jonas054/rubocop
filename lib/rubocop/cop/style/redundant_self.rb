@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -43,7 +44,7 @@ module RuboCop
       # We allow uses of `self` with operators because it would be awkward
       # otherwise.
       class RedundantSelf < Cop
-        MSG = 'Redundant `self` detected.'
+        MSG = 'Redundant `self` detected.'.freeze
 
         def initialize(config = nil, options = nil)
           super
@@ -58,7 +59,7 @@ module RuboCop
           allow_self(lhs)
         end
 
-        alias_method :on_and_asgn, :on_or_asgn
+        alias on_and_asgn on_or_asgn
 
         def on_op_asgn(node)
           lhs, _op, _rhs = *node
@@ -93,8 +94,10 @@ module RuboCop
         def on_send(node)
           receiver, method_name, *_args = *node
           return unless receiver && receiver.type == :self
-          return if operator?(method_name) || keyword?(method_name) ||
+          return if operator?(method_name) ||
+                    keyword?(method_name) ||
                     constant_name?(method_name) ||
+                    node.asgn_method_call? ||
                     @allowed_send_nodes.include?(node) ||
                     @local_variables.include?(method_name)
 
@@ -103,8 +106,8 @@ module RuboCop
 
         def autocorrect(node)
           receiver, _method_name, *_args = *node
-          @corrections << lambda do |corrector|
-            corrector.remove(receiver.loc.expression)
+          lambda do |corrector|
+            corrector.remove(receiver.source_range)
             corrector.remove(node.loc.dot)
           end
         end
@@ -112,12 +115,8 @@ module RuboCop
         private
 
         def on_argument(node)
-          name, _ = *node
+          name, = *node
           @local_variables << name
-        end
-
-        def operator?(method_name)
-          method_name.to_s =~ /\W/
         end
 
         def keyword?(method_name)

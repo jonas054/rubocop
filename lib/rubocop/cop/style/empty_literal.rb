@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,9 +7,9 @@ module RuboCop
       # This cop checks for the use of a method, the result of which
       # would be a literal, like an empty array, hash or string.
       class EmptyLiteral < Cop
-        ARR_MSG = 'Use array literal `[]` instead of `Array.new`.'
-        HASH_MSG = 'Use hash literal `{}` instead of `Hash.new`.'
-        STR_MSG = "Use string literal `''` instead of `String.new`."
+        ARR_MSG = 'Use array literal `[]` instead of `Array.new`.'.freeze
+        HASH_MSG = 'Use hash literal `{}` instead of `Hash.new`.'.freeze
+        STR_MSG = "Use string literal `''` instead of `String.new`.".freeze
 
         # Empty array node
         #
@@ -29,30 +30,55 @@ module RuboCop
         STR_NODE = s(:send, s(:const, nil, :String), :new)
 
         def on_send(node)
-          return if part_of_ignored_node?(node)
-
           case node
           when ARRAY_NODE
             add_offense(node, :expression, ARR_MSG)
           when HASH_NODE
+            # If Hash.new takes a block, it can't be changed to {}.
+            return if node.parent && node.parent.block_type?
+
             add_offense(node, :expression, HASH_MSG)
           when STR_NODE
             add_offense(node, :expression, STR_MSG)
           end
         end
 
-        # TODO: Check block contents as well.
-        alias_method :on_block, :ignore_node
-
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            name = case node
-                   when ARRAY_NODE then '[]'
-                   when HASH_NODE then '{}'
-                   when STR_NODE then "''"
+          name = case node
+                 when ARRAY_NODE
+                   '[]'
+                 when HASH_NODE
+                   # `some_method {}` is not same as `some_method Hash.new`
+                   # because the braces are interpreted as a block, so we avoid
+                   # the correction. Parentheses around the arguments would
+                   # solve the problem, but we let the user add those manually.
+                   return if first_arg_in_method_call_without_parentheses?(node)
+                   '{}'
+                 when STR_NODE
+                   if enforce_double_quotes?
+                     '""'
+                   else
+                     "''"
                    end
-            corrector.replace(node.loc.expression, name)
-          end
+                 end
+          ->(corrector) { corrector.replace(node.source_range, name) }
+        end
+
+        private
+
+        def enforce_double_quotes?
+          string_literals_config['EnforcedStyle'] == 'double_quotes'
+        end
+
+        def string_literals_config
+          config.for_cop('Style/StringLiterals')
+        end
+
+        def first_arg_in_method_call_without_parentheses?(node)
+          return false unless node.parent && node.parent.send_type?
+
+          _receiver, _method_name, *args = *node.parent
+          node.object_id == args.first.object_id && !parentheses?(node.parent)
         end
       end
     end

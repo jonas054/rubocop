@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -16,8 +17,9 @@ module RuboCop
       class CyclomaticComplexity < Cop
         include MethodComplexity
 
-        MSG = 'Cyclomatic complexity for %s is too high. [%d/%d]'
-        COUNTED_NODES = [:if, :while, :until, :for, :rescue, :when, :and, :or]
+        MSG = 'Cyclomatic complexity for %s is too high. [%d/%d]'.freeze
+        COUNTED_NODES = [:if, :while, :until, :for,
+                         :rescue, :when, :and, :or].freeze
 
         private
 

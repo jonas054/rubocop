@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -225,9 +226,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
   context 'when a variable is assigned with operator assignment ' \
           'in top level' do
     let(:source) do
-      [
-        'foo ||= 1'
-      ]
+      'foo ||= 1'
     end
 
     it 'registers an offense' do
@@ -254,7 +253,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
       ]
     end
 
-    it 'registers offenses for each asignment' do
+    it 'registers offenses for each assignment' do
       inspect_source(cop, source)
       expect(cop.offenses.size).to eq(2)
 
@@ -1354,9 +1353,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
 
   context 'when a named capture is unreferenced in top level' do
     let(:source) do
-      [
-        "/(?<foo>\w+)/ =~ 'FOO'"
-      ]
+      "/(?<foo>\w+)/ =~ 'FOO'"
     end
 
     it 'registers an offense' do
@@ -1375,7 +1372,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
     let(:source) do
       [
         'def some_method',
-        "  /(?<foo>\w+)/ =~ 'FOO'",
+        "  /(?<foo>\\w+)/ =~ 'FOO'",
         'end'
       ]
     end
@@ -1386,7 +1383,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
       expect(cop.offenses.first.message)
         .to eq('Useless assignment to variable - `foo`.')
       expect(cop.offenses.first.line).to eq(2)
-      expect(cop.highlights).to eq(["/(?<foo>\w+)/"])
+      expect(cop.highlights).to eq(['/(?<foo>\w+)/'])
     end
 
     # MRI 2.0 accepts this case, but I have no idea why it does so
@@ -1415,7 +1412,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
       [
         'def some_method',
         "  foo = 'some string'",
-        "  /(?<foo>\w+)/ =~ foo",
+        '  /(?<foo>\w+)/ =~ foo',
         '  puts foo',
         'end'
       ]
@@ -1592,9 +1589,7 @@ describe RuboCop::Cop::Lint::UselessAssignment do
 
   context 'when there is only one AST node and it is unused variable' do
     let(:source) do
-      [
-        'foo = 1'
-      ]
+      'foo = 1'
     end
 
     it 'registers an offense' do
@@ -1611,7 +1606,6 @@ describe RuboCop::Cop::Lint::UselessAssignment do
 
   context 'when a variable is assigned ' \
           'while being passed to a method taking block' do
-
     context 'and the variable is used' do
       let(:source) do
         [
@@ -1646,8 +1640,8 @@ describe RuboCop::Cop::Lint::UselessAssignment do
     end
   end
 
-  context 'when a variabled is assigned ' \
-          'and passed to a method followed by method taking block'  do
+  context 'when a variable is assigned ' \
+          'and passed to a method followed by method taking block' do
     let(:source) do
       [
         "pattern = '*.rb'",
@@ -1779,6 +1773,25 @@ describe RuboCop::Cop::Lint::UselessAssignment do
         expect(cop.offenses.size).to eq(1)
         expect(cop.offenses.first.message)
           .to eq('Useless assignment to variable - `enviromnent`.')
+      end
+    end
+
+    # regression test, from problem in Locatable
+    context 'when a variable is assigned in 2 identical if branches' do
+      let(:source) do
+        ['def foo',
+         '  if bar',
+         '    foo = 1',
+         '  else',
+         '    foo = 1',
+         '  end',
+         '  foo.bar.baz',
+         'end']
+      end
+
+      it "doesn't think 1 of the 2 assignments is useless" do
+        inspect_source(cop, source)
+        expect(cop.offenses).to be_empty
       end
     end
   end

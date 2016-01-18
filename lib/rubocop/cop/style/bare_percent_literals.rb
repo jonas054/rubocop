@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,7 @@ module RuboCop
       class BarePercentLiterals < Cop
         include ConfigurableEnforcedStyle
 
-        MSG = 'Use `%%%s` instead of `%%%s`.'
+        MSG = 'Use `%%%s` instead of `%%%s`.'.freeze
 
         def on_dstr(node)
           check(node)
@@ -36,7 +37,7 @@ module RuboCop
         def autocorrect(node)
           src = node.loc.begin.source
           replacement = src.start_with?('%Q') ? '%' : '%Q'
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             corrector.replace(node.loc.begin, src.sub(/%Q?/, replacement))
           end
         end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -12,7 +13,7 @@ module RuboCop
         include ConfigurableMax
 
         MSG = 'Separate every 3 digits in the integer portion of a number ' \
-              'with underscores(_).'
+              'with underscores(_).'.freeze
 
         def on_int(node)
           check(node)
@@ -46,16 +47,13 @@ module RuboCop
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            corrector.replace(
-              node.loc.expression,
-              format_number(node)
-            )
+          lambda do |corrector|
+            corrector.replace(node.source_range, format_number(node))
           end
         end
 
         def format_number(node)
-          int_part, float_part = node.loc.expression.source.split('.')
+          int_part, float_part = node.source.split('.')
           int_part = int_part.to_i
           formatted_int = int_part
                           .abs
@@ -73,7 +71,7 @@ module RuboCop
         end
 
         def integer_part(node)
-          node.loc.expression.source.sub(/^[+-]/, '').split('.').first
+          node.source.sub(/^[+-]/, '').split('.').first
         end
 
         def min_digits

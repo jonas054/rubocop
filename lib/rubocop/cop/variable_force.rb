@@ -1,9 +1,10 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     # This force provides a way to track local variables and scopes of Ruby.
-    # Cops intertact with this force need to override some of the hook methods.
+    # Cops interact with this force need to override some of the hook methods.
     #
     #     def before_entering_scope(scope, variable_table)
     #     end
@@ -31,7 +32,7 @@ module RuboCop
       ARGUMENT_DECLARATION_TYPES = [
         :arg, :optarg, :restarg,
         :kwarg, :kwoptarg, :kwrestarg,
-        :blockarg, # This doen't mean block argument, it's block-pass (&block).
+        :blockarg, # This doesn't mean block argument, it's block-pass (&block).
         :shadowarg # This means block local variable (obj.each { |arg; this| }).
       ].freeze
 
@@ -53,11 +54,13 @@ module RuboCop
       TWISTED_SCOPE_TYPES = [:block, :class, :sclass, :defs].freeze
       SCOPE_TYPES = (TWISTED_SCOPE_TYPES + [:module, :def]).freeze
 
+      SEND_TYPE = :send
+
       def self.wrap_with_top_level_scope_node(root_node)
         if root_node.begin_type?
           root_node
         else
-          Astrolabe::Node.new(:begin, [root_node])
+          Node.new(:begin, [root_node])
         end
       end
 
@@ -104,24 +107,26 @@ module RuboCop
       # rubocop:disable Metrics/MethodLength, Metrics/CyclomaticComplexity
       def dispatch_node(node)
         case node.type
-        when *ARGUMENT_DECLARATION_TYPES
-          process_variable_declaration(node)
         when VARIABLE_ASSIGNMENT_TYPE
           process_variable_assignment(node)
         when REGEXP_NAMED_CAPTURE_TYPE
           process_regexp_named_captures(node)
-        when *OPERATOR_ASSIGNMENT_TYPES
-          process_variable_operator_assignment(node)
         when MULTIPLE_ASSIGNMENT_TYPE
           process_variable_multiple_assignment(node)
         when VARIABLE_REFERENCE_TYPE
           process_variable_referencing(node)
-        when *LOOP_TYPES
-          process_loop(node)
         when RESCUE_TYPE
           process_rescue(node)
         when ZERO_ARITY_SUPER_TYPE
           process_zero_arity_super(node)
+        when SEND_TYPE
+          process_send(node)
+        when *ARGUMENT_DECLARATION_TYPES
+          process_variable_declaration(node)
+        when *OPERATOR_ASSIGNMENT_TYPES
+          process_variable_operator_assignment(node)
+        when *LOOP_TYPES
+          process_loop(node)
         when *SCOPE_TYPES
           process_scope(node)
         end
@@ -281,6 +286,16 @@ module RuboCop
         skip_children!
       end
 
+      def process_send(node)
+        _receiver, method_name, args = *node
+        return unless method_name == :binding
+        return if args && !args.children.empty?
+
+        variable_table.accessible_variables.each do |variable|
+          variable.reference!(node)
+        end
+      end
+
       # Mark all assignments which are referenced in the same loop
       # as referenced by ignoring AST order since they would be referenced
       # in next iteration.
@@ -290,7 +305,7 @@ module RuboCop
 
         referenced_variable_names_in_loop.each do |name|
           variable = variable_table.find_variable(name)
-          # Non related references which are catched in the above scan
+          # Non related references which are caught in the above scan
           # would be skipped here.
           next unless variable
           variable.assignments.each do |assignment|
@@ -312,13 +327,13 @@ module RuboCop
           case node.type
           when :lvar
             referenced_variable_names_in_loop << node.children.first
+          when :lvasgn
+            assignment_nodes_in_loop << node
           when *OPERATOR_ASSIGNMENT_TYPES
             asgn_node = node.children.first
             if asgn_node.type == :lvasgn
               referenced_variable_names_in_loop << asgn_node.children.first
             end
-          when :lvasgn
-            assignment_nodes_in_loop << node
           end
         end
 

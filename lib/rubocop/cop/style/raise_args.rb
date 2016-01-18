@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,7 +9,7 @@ module RuboCop
         include ConfigurableEnforcedStyle
 
         def on_send(node)
-          return unless command?(:raise, node) || command?(:fail, node)
+          return unless node.command?(:raise) || node.command?(:fail)
 
           case style
           when :compact

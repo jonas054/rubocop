@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -32,17 +33,18 @@ describe RuboCop::Cop::Style::DotPosition, :config do
     end
 
     it 'does not err on method call with no dots' do
-      inspect_source(cop, ['puts something'])
+      inspect_source(cop, 'puts something')
       expect(cop.offenses).to be_empty
     end
 
     it 'does not err on method call without a method name' do
-      inspect_source(cop, ['l.', '(1)'])
+      inspect_source(cop, ['l.',
+                           '(1)'])
       expect(cop.offenses.size).to eq(1)
     end
 
     it 'does not err on method call on same line' do
-      inspect_source(cop, ['something.method_name'])
+      inspect_source(cop, 'something.method_name')
       expect(cop.offenses).to be_empty
     end
 
@@ -70,6 +72,24 @@ describe RuboCop::Cop::Style::DotPosition, :config do
                                 'something',
                                 '  .method_name'].join("\n"))
     end
+
+    context 'when there is an intervening line comment' do
+      it 'does not register offense' do
+        inspect_source(cop, ['something.',
+                             '# a comment here',
+                             '  method_name'])
+        expect(cop.offenses).to be_empty
+      end
+    end
+
+    context 'when there is an intervening blank line' do
+      it 'does not register offense' do
+        inspect_source(cop, ['something.',
+                             '',
+                             '  method_name'])
+        expect(cop.offenses).to be_empty
+      end
+    end
   end
 
   context 'Trailing dots style' do
@@ -92,17 +112,18 @@ describe RuboCop::Cop::Style::DotPosition, :config do
     end
 
     it 'does not err on method call with no dots' do
-      inspect_source(cop, ['puts something'])
+      inspect_source(cop, 'puts something')
       expect(cop.offenses).to be_empty
     end
 
     it 'does not err on method call without a method name' do
-      inspect_source(cop, ['l', '.(1)'])
+      inspect_source(cop, ['l',
+                           '.(1)'])
       expect(cop.offenses.size).to eq(1)
     end
 
     it 'does not err on method call on same line' do
-      inspect_source(cop, ['something.method_name'])
+      inspect_source(cop, 'something.method_name')
       expect(cop.offenses).to be_empty
     end
 

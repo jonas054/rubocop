@@ -1,11 +1,13 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
 describe RuboCop::ProcessedSource do
   include FileHelper
 
-  subject(:processed_source) { described_class.new(source, path) }
+  subject(:processed_source) { described_class.new(source, ruby_version, path) }
+  let(:ruby_version) { RuboCop::Config::KNOWN_RUBIES.last }
 
   let(:source) { <<-END.strip_indent }
     # encoding: utf-8
@@ -18,18 +20,27 @@ describe RuboCop::ProcessedSource do
   let(:path) { 'path/to/file.rb' }
 
   describe '.from_file', :isolated_environment do
-    before do
-      create_file(path, 'foo')
+    describe 'when the file exists' do
+      before do
+        create_file(path, 'foo')
+      end
+
+      let(:processed_source) { described_class.from_file(path, ruby_version) }
+
+      it 'returns an instance of ProcessedSource' do
+        expect(processed_source).to be_a(described_class)
+      end
+
+      it "sets the file path to the instance's #path" do
+        expect(processed_source.path).to eq(path)
+      end
     end
 
-    let(:processed_source) { described_class.from_file(path) }
-
-    it 'returns an instance of ProcessedSource' do
-      expect(processed_source).to be_a(described_class)
-    end
-
-    it "sets the file path to the instance's #path" do
-      expect(processed_source.path).to eq(path)
+    it 'raises RuboCop::Error when the file does not exist' do
+      expect do
+        described_class.from_file('foo', ruby_version)
+      end.to raise_error(RuboCop::Error)
+        .with_message(/No such file or directory/)
     end
   end
 
@@ -47,7 +58,7 @@ describe RuboCop::ProcessedSource do
 
   describe '#ast' do
     it 'is the root node of AST' do
-      expect(processed_source.ast).to be_a(Astrolabe::Node)
+      expect(processed_source.ast).to be_a(RuboCop::Node)
     end
   end
 
@@ -81,19 +92,21 @@ describe RuboCop::ProcessedSource do
       end
     end
 
-    context 'when the source lacks encoding comment and is really utf-8 ' \
-            'encoded but has been read as US-ASCII' do
-      let(:source) do
-        # When files are read into RuboCop, the encoding of source code lacking
-        # an encoding comment will default to the external encoding, which
-        # could for example be US-ASCII if the LC_ALL environment variable is
-        # set to "C".
-        '号码 = 3'.force_encoding('US-ASCII')
-      end
+    if RUBY_VERSION < '2.3.0'
+      context 'when the source lacks encoding comment and is really utf-8 ' \
+              'encoded but has been read as US-ASCII' do
+        let(:source) do
+          # When files are read into RuboCop, the encoding of source code
+          # lacking an encoding comment will default to the external encoding,
+          # which could for example be US-ASCII if the LC_ALL environment
+          # variable is set to "C".
+          '号码 = 3'.force_encoding('US-ASCII')
+        end
 
-      it 'is nil' do
-        # ProcessedSource#parse sets UTF-8 as default encoding, so no error.
-        expect(processed_source.parser_error).to be_nil
+        it 'is nil' do
+          # ProcessedSource#parse sets UTF-8 as default encoding, so no error.
+          expect(processed_source.parser_error).to be_nil
+        end
       end
     end
 
@@ -178,6 +191,15 @@ describe RuboCop::ProcessedSource do
 
       it 'returns false' do
         expect(processed_source).not_to be_valid_syntax
+      end
+    end
+
+    context 'when a line starts with an integer literal' do
+      let(:source) { '1 + 1' }
+
+      # regression test
+      it 'tokenizes the source correctly' do
+        expect(processed_source.tokens[0].text).to eq '1'
       end
     end
   end

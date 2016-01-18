@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -24,19 +25,19 @@ describe RuboCop::ConfigStore do
 
   describe '.for' do
     it 'always uses config specified in command line' do
-      config_store.options_config = :options_config
-      expect(config_store.for('file1')).to eq('merged options_config')
+      config_store.options_config = { options_config: true }
+      expect(config_store.for('file1')).to eq('merged {:options_config=>true}')
     end
 
     context 'when no config specified in command line' do
       it 'gets config path and config from cache if available' do
-        expect(RuboCop::ConfigLoader).to receive(:configuration_file_for).once
-          .with('dir')
-        expect(RuboCop::ConfigLoader).to receive(:configuration_file_for).once
-          .with('dir/subdir')
+        expect(RuboCop::ConfigLoader)
+          .to receive(:configuration_file_for).once.with('dir')
+        expect(RuboCop::ConfigLoader)
+          .to receive(:configuration_file_for).once.with('dir/subdir')
         # The stub returns the same config path for dir and dir/subdir.
-        expect(RuboCop::ConfigLoader).to receive(:configuration_from_file).once
-          .with('dir/.rubocop.yml')
+        expect(RuboCop::ConfigLoader)
+          .to receive(:configuration_from_file).once.with('dir/.rubocop.yml')
 
         config_store.for('dir/file2')
         config_store.for('dir/file2')

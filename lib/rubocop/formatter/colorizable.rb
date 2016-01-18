@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Formatter
@@ -9,7 +10,11 @@ module RuboCop
       def rainbow
         @rainbow ||= begin
           rainbow = Rainbow.new
-          rainbow.enabled = false unless output.tty?
+          if options[:color]
+            rainbow.enabled = true
+          elsif options[:color] == false || !output.tty?
+            rainbow.enabled = false
+          end
           rainbow
         end
       end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,6 +10,7 @@ module RuboCop
       # allowed, however.
       class For < Cop
         include ConfigurableEnforcedStyle
+        EACH_LENGTH = 'each'.length
 
         def on_for(node)
           if style == :each
@@ -30,9 +32,9 @@ module RuboCop
           return unless method_name == :each && args.empty?
 
           if style == :for
-            end_pos = method.loc.expression.end_pos
+            end_pos = method.source_range.end_pos
             range = Parser::Source::Range.new(processed_source.buffer,
-                                              end_pos - 'each'.length,
+                                              end_pos - EACH_LENGTH,
                                               end_pos)
             add_offense(range, range, 'Prefer `for` over `each`.') do
               opposite_style_detected

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -15,11 +16,19 @@ module RuboCop
 
         def check_argument(variable)
           return unless variable.method_argument?
+          return if variable.keyword_argument? &&
+                    cop_config['AllowUnusedKeywordArguments']
+
+          if cop_config['IgnoreEmptyMethods']
+            _name, _args, body = *variable.scope.node
+            return if body.nil?
+          end
+
           super
         end
 
         def message(variable)
-          message = "Unused method argument - `#{variable.name}`."
+          message = String.new("Unused method argument - `#{variable.name}`.")
 
           unless variable.keyword_argument?
             message << " If it's necessary, use `_` or `_#{variable.name}` " \

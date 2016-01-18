@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -27,7 +28,8 @@ module RuboCop
         end
 
         def alternative_message(diagnostic)
-          diagnostic.message
+          diagnostic
+            .message
             .capitalize
             .gsub('character syntax', 'character literal')
         end

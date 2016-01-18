@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -23,6 +24,136 @@ describe RuboCop::Cop::Style::EmptyLineBetweenDefs, :config do
     inspect_source(cop, source)
     expect(cop.offenses.size).to eq(1)
     expect(cop.offenses.map(&:line).sort).to eq([7])
+  end
+
+  context 'when there are only comments between defs' do
+    let(:source) do
+      ['class J',
+       '  def n',
+       '  end # n-related',
+       '  # checks something o-related',
+       '  # and more',
+       '  def o',
+       '  end',
+       'end']
+    end
+
+    it 'registers an offense' do
+      inspect_source(cop, source)
+      expect(cop.offenses.size).to eq(1)
+    end
+
+    it 'auto-corrects' do
+      corrected = autocorrect_source(cop, source)
+      expect(corrected).to eq(['class J',
+                               '  def n',
+                               '  end # n-related',
+                               '',
+                               '  # checks something o-related',
+                               '  # and more',
+                               '  def o',
+                               '  end',
+                               'end'].join("\n"))
+    end
+  end
+
+  context 'conditional method definitions' do
+    it 'accepts defs inside a conditional without blank lines in between' do
+      source = ['if condition',
+                '  def foo',
+                '    true',
+                '  end',
+                'else',
+                '  def foo',
+                '    false',
+                '  end',
+                'end']
+      inspect_source(cop, source)
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for consecutive defs inside a conditional' do
+      source = ['if condition',
+                '  def foo',
+                '    true',
+                '  end',
+                '  def bar',
+                '    true',
+                '  end',
+                'else',
+                '  def foo',
+                '    false',
+                '  end',
+                'end']
+      inspect_source(cop, source)
+      expect(cop.offenses.size).to eq(1)
+    end
+  end
+
+  context 'class methods' do
+    context 'adjacent class methods' do
+      let(:offending_source) do
+        ['class Test',
+         '  def self.foo',
+         '    true',
+         '  end',
+         '  def self.bar',
+         '    true',
+         '  end',
+         'end']
+      end
+
+      it 'registers an offense for missing blank line between methods' do
+        inspect_source(cop, offending_source)
+        expect(cop.offenses.size).to eq(1)
+      end
+
+      it 'autocorrects it' do
+        corrected = autocorrect_source(cop, offending_source)
+        expect(corrected).to eq(['class Test',
+                                 '  def self.foo',
+                                 '    true',
+                                 '  end',
+                                 '',
+                                 '  def self.bar',
+                                 '    true',
+                                 '  end',
+                                 'end']
+                                 .join("\n"))
+      end
+    end
+
+    context 'mixed instance and class methods' do
+      let(:offending_source) do
+        ['class Test',
+         '  def foo',
+         '    true',
+         '  end',
+         '  def self.bar',
+         '    true',
+         '  end',
+         'end']
+      end
+
+      it 'registers an offense for missing blank line between methods' do
+        inspect_source(cop, offending_source)
+        expect(cop.offenses.size).to eq(1)
+      end
+
+      it 'autocorrects it' do
+        corrected = autocorrect_source(cop, offending_source)
+        expect(corrected).to eq(['class Test',
+                                 '  def foo',
+                                 '    true',
+                                 '  end',
+                                 '',
+                                 '  def self.bar',
+                                 '    true',
+                                 '  end',
+                                 'end']
+                                 .join("\n"))
+      end
+    end
   end
 
   # Only one def, so rule about empty line *between* defs does not
@@ -108,6 +239,18 @@ describe RuboCop::Cop::Style::EmptyLineBetweenDefs, :config do
     expect(corrected).to eq(['  def a; end',
                              '',
                              '  def b; end'].join("\n"))
+  end
+
+  it 'treats lines with whitespaces as blank' do
+    source = ['  class J',
+              '    def n',
+              '    end',
+              '    ',
+              '    def o',
+              '    end',
+              '  end']
+    inspect_source(cop, source)
+    expect(cop.offenses).to be_empty
   end
 
   context 'when AllowAdjacentOneLineDefs is enabled' do

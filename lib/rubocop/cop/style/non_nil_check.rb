@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -84,26 +85,29 @@ module RuboCop
         end
 
         def autocorrect_comparison(node)
-          @corrections << lambda do |corrector|
-            expr = node.loc.expression
-            new_code =
-              if include_semantic_changes?
-                expr.source.sub(/\s*!=\s*nil/, '')
-              else
-                expr.source.sub(/^(\S*)\s*!=\s*nil/, '!\1.nil?')
-              end
-            corrector.replace(expr, new_code)
+          expr = node.source
+
+          new_code =
+            if include_semantic_changes?
+              expr.sub(/\s*!=\s*nil/, '')
+            else
+              expr.sub(/^(\S*)\s*!=\s*nil/, '!\1.nil?')
+            end
+
+          return if expr == new_code
+
+          lambda do |corrector|
+            corrector.replace(node.source_range, new_code)
           end
         end
 
         def autocorrect_non_nil(node, inner_node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             receiver, _method, _args = *inner_node
             if receiver
-              corrector.replace(node.loc.expression,
-                                receiver.loc.expression.source)
+              corrector.replace(node.source_range, receiver.source)
             else
-              corrector.replace(node.loc.expression, 'self')
+              corrector.replace(node.source_range, 'self')
             end
           end
         end

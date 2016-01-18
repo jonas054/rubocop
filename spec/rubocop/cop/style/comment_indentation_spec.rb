@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -55,6 +56,14 @@ describe RuboCop::Cop::Style::CommentIndentation do
                 'Incorrect indentation detected (column 2 instead of 4).',
                 'Incorrect indentation detected (column 4 instead of 0).'])
     end
+  end
+
+  it 'registers offenses before __END__ but not after' do
+    inspect_source(cop, [' #',
+                         '__END__',
+                         '  #'])
+    expect(cop.messages)
+      .to eq(['Incorrect indentation detected (column 1 instead of 0).'])
   end
 
   context 'around program structure keywords' do

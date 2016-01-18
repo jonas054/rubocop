@@ -1,39 +1,39 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # This class handles the processing of files, which includes dealing with
   # formatters and letting cops inspect the files.
-  class Runner
-    attr_reader :errors, :aborting
-    alias_method :aborting?, :aborting
+  class Runner # rubocop:disable Metrics/ClassLength
+    # An exception indicating that the inspection loop got stuck correcting
+    # offenses back and forth.
+    class InfiniteCorrectionLoop < Exception
+      attr_reader :offenses
+
+      def initialize(path, offenses)
+        super "Infinite loop detected in #{path}."
+        @offenses = offenses
+      end
+    end
+
+    attr_reader :errors, :warnings, :aborting
+    alias aborting? aborting
 
     def initialize(options, config_store)
       @options = options
       @config_store = config_store
       @errors = []
+      @warnings = []
       @aborting = false
     end
 
     def run(paths)
       target_files = find_target_files(paths)
-
-      inspected_files = []
-      all_passed = true
-
-      formatter_set.started(target_files)
-
-      target_files.each do |file|
-        break if aborting?
-        offenses = process_file(file)
-        all_passed = false if offenses.any? { |o| considered_failure?(o) }
-        inspected_files << file
-        break if @options[:fail_fast] && !all_passed
+      if @options[:list_target_files]
+        list_files(target_files)
+      else
+        inspect_files(target_files)
       end
-
-      formatter_set.finished(inspected_files.freeze)
-      formatter_set.close_output_files
-
-      all_passed
     end
 
     def abort
@@ -48,50 +48,158 @@ module RuboCop
       target_files.each(&:freeze).freeze
     end
 
+    def inspect_files(files)
+      inspected_files = []
+      all_passed = true
+
+      formatter_set.started(files)
+
+      files.each do |file|
+        break if aborting?
+        offenses = process_file(file)
+        all_passed = false if offenses.any? { |o| considered_failure?(o) }
+        inspected_files << file
+        break if @options[:fail_fast] && !all_passed
+      end
+
+      all_passed
+    ensure
+      ResultCache.cleanup(@config_store, @options[:debug]) if cached_run?
+      formatter_set.finished(inspected_files.freeze)
+      formatter_set.close_output_files
+    end
+
+    def list_files(paths)
+      paths.each do |path|
+        puts PathUtil.relative_path(path)
+      end
+    end
+
     def process_file(file)
       puts "Scanning #{file}" if @options[:debug]
+      file_started(file)
 
-      processed_source = ProcessedSource.from_file(file)
+      cache = ResultCache.new(file, @options, @config_store) if cached_run?
+      if cache && cache.valid?
+        offenses = cache.load
+      else
+        source = get_processed_source(file)
+        source, offenses = do_inspection_loop(file, source)
+        offenses = add_unneeded_disables(file, offenses.compact.sort, source)
+        save_in_cache(cache, offenses)
+      end
 
-      formatter_set.file_started(file, file_info(processed_source))
-
-      offenses = do_inspection_loop(file, processed_source)
-
-      formatter_set.file_finished(file, offenses.compact.sort.freeze)
+      formatter_set.file_finished(file, offenses)
       offenses
+    rescue InfiniteCorrectionLoop => e
+      formatter_set.file_finished(file, e.offenses.compact.sort.freeze)
+      raise
+    end
+
+    def add_unneeded_disables(file, offenses, source)
+      if source.disabled_line_ranges.any? &&
+         # Don't check unneeded disable if --only or --except option is
+         # given, because these options override configuration.
+         (@options[:except] || []).empty? && (@options[:only] || []).empty?
+        config = @config_store.for(file)
+        if config['Lint/UnneededDisable']['Enabled']
+          cop = Cop::Lint::UnneededDisable.new(config, @options)
+          cop.check(offenses, source.disabled_line_ranges, source.comments)
+          offenses += cop.offenses
+        end
+      end
+
+      offenses.sort.reject(&:disabled?).freeze
+    end
+
+    def file_started(file)
+      formatter_set.file_started(file,
+                                 cli_options: @options,
+                                 config_store: @config_store)
+    end
+
+    def cached_run?
+      @cached_run ||=
+        (@options[:cache] == 'true' ||
+         @options[:cache] != 'false' &&
+         @config_store.for(Dir.pwd)['AllCops']['UseCache']) &&
+        # When running --auto-gen-config, there's some processing done in the
+        # cops related to calculating the Max parameters for Metrics cops. We
+        # need to do that processing and can not use caching.
+        !@options[:auto_gen_config] &&
+        # Auto-correction needs a full run. It can not use cached results.
+        !@options[:auto_correct] &&
+        # We can't cache results from code which is piped in to stdin
+        !@options[:stdin]
+    end
+
+    def save_in_cache(cache, offenses)
+      return unless cache
+      # Caching results when a cop has crashed would prevent the crash in the
+      # next run, since the cop would not be called then. We want crashes to
+      # show up the same in each run.
+      return if errors.any? || warnings.any?
+
+      cache.save(offenses)
     end
 
     def do_inspection_loop(file, processed_source)
       offenses = []
+
+      # Keep track of the state of the source. If a cop modifies the source
+      # and another cop undoes it producing identical source we have an
+      # infinite loop.
+      @processed_sources = []
 
       # When running with --auto-correct, we need to inspect the file (which
       # includes writing a corrected version of it) until no more corrections
       # are made. This is because automatic corrections can introduce new
       # offenses. In the normal case the loop is only executed once.
       loop do
+        check_for_infinite_loop(processed_source, offenses)
+
         # The offenses that couldn't be corrected will be found again so we
         # only keep the corrected ones in order to avoid duplicate reporting.
         offenses.select!(&:corrected?)
-
         new_offenses, updated_source_file = inspect_file(processed_source)
         offenses.concat(new_offenses).uniq!
-        break unless updated_source_file
 
         # We have to reprocess the source to pickup the changes. Since the
         # change could (theoretically) introduce parsing errors, we break the
         # loop if we find any.
-        processed_source = ProcessedSource.from_file(file)
+        break unless updated_source_file
+
+        processed_source = get_processed_source(file)
       end
 
-      offenses
+      [processed_source, offenses]
+    end
+
+    # Check whether a run created source identical to a previous run, which
+    # means that we definitely have an infinite loop.
+    def check_for_infinite_loop(processed_source, offenses)
+      checksum = processed_source.checksum
+
+      if @processed_sources.include?(checksum)
+        fail InfiniteCorrectionLoop.new(processed_source.path, offenses)
+      end
+
+      @processed_sources << checksum
     end
 
     def inspect_file(processed_source)
       config = @config_store.for(processed_source.path)
+      enable_rails_cops(config) if @options[:rails]
       team = Cop::Team.new(mobilized_cop_classes(config), config, @options)
       offenses = team.inspect_file(processed_source)
       @errors.concat(team.errors)
+      @warnings.concat(team.warnings)
       [offenses, team.updated_source_file?]
+    end
+
+    def enable_rails_cops(config)
+      config['Rails'] ||= {}
+      config['Rails']['Enabled'] = true
     end
 
     def mobilized_cop_classes(config)
@@ -99,52 +207,51 @@ module RuboCop
       @mobilized_cop_classes[config.object_id] ||= begin
         cop_classes = Cop::Cop.all
 
-        if @options[:only]
-          validate_only_option
-
-          cop_classes.select! do |c|
-            @options[:only].include?(c.cop_name) || @options[:lint] && c.lint?
-          end
-        else
-          # filter out Rails cops unless requested
-          cop_classes.reject!(&:rails?) unless run_rails_cops?(config)
-
-          # select only lint cops when --lint is passed
-          cop_classes.select!(&:lint?) if @options[:lint]
+        [:only, :except].each do |opt|
+          OptionsValidator.validate_cop_list(@options[opt])
         end
+
+        if @options[:only]
+          cop_classes.select! { |c| c.match?(@options[:only]) }
+        else
+          filter_cop_classes(cop_classes, config)
+        end
+
+        cop_classes.reject! { |c| c.match?(@options[:except]) }
 
         cop_classes
       end
     end
 
-    def validate_only_option
-      @options[:only].each do |cop_to_run|
-        next unless Cop::Cop.all.none? { |c| c.cop_name == cop_to_run }
-        fail ArgumentError, "Unrecognized cop name: #{cop_to_run}."
+    def filter_cop_classes(cop_classes, config)
+      # use only cops that link to a style guide if requested
+      if style_guide_cops_only?(config)
+        cop_classes.select! { |cop| config.for_cop(cop)['StyleGuide'] }
       end
     end
 
-    def run_rails_cops?(config)
-      @options[:rails] || config['AllCops']['RunRailsCops']
+    def style_guide_cops_only?(config)
+      @options[:only_guide_cops] || config['AllCops']['StyleGuideCopsOnly']
     end
 
     def formatter_set
       @formatter_set ||= begin
-        set = Formatter::FormatterSet.new
-        pairs = @options[:formatters] || [[Options::DEFAULT_FORMATTER]]
+        set = Formatter::FormatterSet.new(@options)
+        pairs = @options[:formatters] || [['progress']]
         pairs.each do |formatter_key, output_path|
           set.add_formatter(formatter_key, output_path)
         end
         set
-      rescue => error
-        warn error.message
-        $stderr.puts error.backtrace
-        exit(1)
       end
     end
 
     def considered_failure?(offense)
-      offense.severity >= minimum_severity_to_fail
+      # For :autocorrect level, any offense - corrected or not - is a failure.
+      return false if offense.disabled?
+
+      return true if @options[:fail_level] == :autocorrect
+
+      !offense.corrected? && offense.severity >= minimum_severity_to_fail
     end
 
     def minimum_severity_to_fail
@@ -154,8 +261,14 @@ module RuboCop
       end
     end
 
-    def file_info(processed_source)
-      { cop_disabled_line_ranges: processed_source.disabled_line_ranges }
+    def get_processed_source(file)
+      ruby_version = @config_store.for(file)['AllCops']['TargetRubyVersion']
+
+      if @options[:stdin]
+        ProcessedSource.new(@options[:stdin], ruby_version, file)
+      else
+        ProcessedSource.from_file(file, ruby_version)
+      end
     end
   end
 end

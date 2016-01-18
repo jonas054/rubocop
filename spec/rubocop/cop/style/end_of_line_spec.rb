@@ -1,24 +1,36 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'tempfile'
 
 describe RuboCop::Cop::Style::EndOfLine do
   subject(:cop) { described_class.new }
+
+  it 'accepts an empty file' do
+    inspect_source_file(cop, '')
+    expect(cop.offenses).to be_empty
+  end
 
   it 'registers an offense for CR+LF' do
     inspect_source_file(cop, ['x=0', '', "y=1\r"])
     expect(cop.messages).to eq(['Carriage return character detected.'])
   end
 
-  it 'highlights the whole offendng line' do
+  it 'highlights the whole offending line' do
     inspect_source_file(cop, ['x=0', '', "y=1\r"])
     expect(cop.highlights).to eq(["y=1\r"])
   end
 
   it 'registers an offense for CR at end of file' do
-    inspect_source_file(cop, ["x=0\r"])
+    inspect_source_file(cop, "x=0\r")
     expect(cop.messages).to eq(['Carriage return character detected.'])
+  end
+
+  it 'does not register offenses after __END__' do
+    inspect_source(cop, ['x=0',
+                         '__END__',
+                         "x=0\r"])
+    expect(cop.offenses).to be_empty
   end
 
   shared_examples 'iso-8859-15' do
@@ -56,8 +68,8 @@ describe RuboCop::Cop::Style::EndOfLine do
   end
 
   context 'when source is a string' do
-    it 'registers an offence' do
-      inspect_source(cop, ["x=0\r"])
+    it 'registers an offense' do
+      inspect_source(cop, "x=0\r")
 
       expect(cop.messages).to eq(['Carriage return character detected.'])
     end

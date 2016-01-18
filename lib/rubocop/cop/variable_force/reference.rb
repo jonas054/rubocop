@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
         VARIABLE_REFERENCE_TYPES = (
           [VARIABLE_REFERENCE_TYPE] +
           OPERATOR_ASSIGNMENT_TYPES +
-          [ZERO_ARITY_SUPER_TYPE]
+          [ZERO_ARITY_SUPER_TYPE, SEND_TYPE]
         ).freeze
 
         attr_reader :node, :scope
@@ -32,10 +33,16 @@ module RuboCop
         #       super
         #     end
         #
-        # In this case, the variable `foo` is not explicitly referenced,
-        # but it can be considered used implicitly by the `super`.
+        # Another case is `binding`:
+        #
+        #     def some_method(foo)
+        #       do_something(binding)
+        #     end
+        #
+        # In these cases, the variable `foo` is not explicitly referenced,
+        # but it can be considered used implicitly by the `super` or `binding`.
         def explicit?
-          @node.type != ZERO_ARITY_SUPER_TYPE
+          ![ZERO_ARITY_SUPER_TYPE, SEND_TYPE].include?(@node.type)
         end
       end
     end

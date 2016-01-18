@@ -1,7 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'stringio'
 
 module RuboCop
   module Formatter
@@ -24,8 +24,7 @@ module RuboCop
 
           formatter.file_finished('test', cop.offenses)
           formatter.file_finished('test_2', cop.offenses)
-          expect(output.string).to eq ['test',
-                                       "test_2\n"].join("\n")
+          expect(output.string).to eq "test\ntest_2\n"
         end
       end
     end

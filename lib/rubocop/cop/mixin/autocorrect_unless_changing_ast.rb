@@ -1,49 +1,57 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     # This module does auto-correction of nodes that could become grammatically
     # different after the correction. If the code change would alter the
     # abstract syntax tree, it is not done.
+    #
+    # However, if the code change merely introduces extraneous "begin" nodes
+    # which do not change the meaning of the code, it is still accepted.
+    #
     module AutocorrectUnlessChangingAST
       def autocorrect(node)
-        new_source = rewrite_node(node)
+        current_buffer_src = processed_source.buffer.source
+        replaced_range = node.source_range
+        pre = current_buffer_src[0...replaced_range.begin_pos]
+        post = current_buffer_src[replaced_range.end_pos..-1]
+        new_buffer_src = pre + rewrite_node(node) + post
+        new_processed_src = parse(new_buffer_src, processed_source.buffer.name)
 
-        # Make the correction only if it doesn't change the AST. Regenerate the
-        # AST for `node` so we get it without context. Otherwise the comparison
-        # could be misleading.
-        if ast_for(node.loc.expression.source) != ast_for(new_source)
-          fail CorrectionNotPossible
-        end
+        # Make the correction only if it doesn't change the AST for the buffer.
+        return if !new_processed_src.ast ||
+                  (INLINE_BEGIN.process(processed_source.ast) !=
+                   INLINE_BEGIN.process(new_processed_src.ast))
 
-        if syntax_error?(node.loc.expression, new_source)
-          fail CorrectionNotPossible
-        end
-
-        @corrections << correction(node)
+        correction(node)
       end
 
       private
 
-      def ast_for(source)
-        ProcessedSource.new(source).ast
-      end
-
       def rewrite_node(node)
-        processed_source = ProcessedSource.new(node.loc.expression.source)
-        c = correction(processed_source.ast)
-        Corrector.new(processed_source.buffer, [c]).rewrite
+        ps = parse(node.source)
+        c = correction(ps.ast)
+        Corrector.new(ps.buffer, [c]).rewrite
       end
 
-      # Return true if the change would introduce a syntax error in the buffer
-      # source.
-      def syntax_error?(replaced_range, new_source)
-        current_buffer_src = processed_source.buffer.source
-        pre = current_buffer_src[0...replaced_range.begin_pos]
-        post = current_buffer_src[replaced_range.end_pos..-1]
-        new_buffer_src = pre + new_source + post
-        !ProcessedSource.new(new_buffer_src).valid_syntax?
+      # 'begin' nodes with a single child can be removed without changing
+      # the semantics of an AST. Canonicalizing an AST in this way can help
+      # us determine whether it has really changed in a meaningful way, or
+      # not. This means we can auto-correct in cases where we would otherwise
+      # refrain from doing so.
+      #
+      # If any other simplifications can be done to an AST without changing
+      # its meaning, they should be added here (and the class renamed).
+      # This will make autocorrection more powerful across the board.
+      #
+      class InlineBeginNodes < Parser::AST::Processor
+        def on_begin(node)
+          node.children.one? ? process(node.children[0]) : super
+        end
       end
+
+      INLINE_BEGIN = InlineBeginNodes.new
     end
   end
 end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -23,10 +24,11 @@ module RuboCop
         private
 
         def on_method_def(node, method_name, _args, _body)
-          predicate_prefices.each do |prefix|
+          predicate_prefixes.each do |prefix|
             method_name = method_name.to_s
             next unless method_name.start_with?(prefix)
             next if method_name == expected_name(method_name, prefix)
+            next if predicate_whitelist.include?(method_name)
             add_offense(
               node,
               :name,
@@ -53,8 +55,12 @@ module RuboCop
           cop_config['NamePrefixBlacklist']
         end
 
-        def predicate_prefices
+        def predicate_prefixes
           cop_config['NamePrefix']
+        end
+
+        def predicate_whitelist
+          cop_config['NameWhitelist']
         end
       end
     end

@@ -1,53 +1,43 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Lint
       # This cop checks for calls to debugger or pry.
       class Debugger < Cop
-        MSG = 'Remove debugger entry point `%s`.'
+        MSG = 'Remove debugger entry point `%s`.'.freeze
 
-        # debugger call node
-        #
-        # (send nil :debugger)
-        DEBUGGER_NODE = s(:send, nil, :debugger)
+        def_node_matcher :debugger_call?, <<-END
+          {(send nil {:debugger :byebug} ...)
+           (send (send nil :binding)
+             {:pry :remote_pry :pry_remote} ...)
+           (send (const nil :Pry) :rescue ...)
+           (send nil {:save_and_open_page
+                      :save_and_open_screenshot
+                      :save_screenshot} ...)}
+        END
 
-        # byebug call node
-        #
-        # (send nil :byebug)
-        BYEBUG_NODE = s(:send, nil, :byebug)
-
-        # binding.pry node
-        #
-        # (send
-        #   (send nil :binding) :pry)
-        PRY_NODE = s(:send, s(:send, nil, :binding), :pry)
-
-        # binding.remote_pry node
-        #
-        # (send
-        #   (send nil :binding) :remote_pry)
-        REMOTE_PRY_NODE = s(:send, s(:send, nil, :binding), :remote_pry)
-
-        # binding.pry_remote node
-        #
-        # (send
-        #   (send nil :binding) :pry_remote)
-        PRY_REMOTE_NODE = s(:send, s(:send, nil, :binding), :pry_remote)
-
-        DEBUGGER_NODES = [
-          DEBUGGER_NODE,
-          BYEBUG_NODE,
-          PRY_NODE,
-          REMOTE_PRY_NODE,
-          PRY_REMOTE_NODE
-        ]
+        def_node_matcher :pry_rescue?, '(send (const nil :Pry) :rescue ...)'
 
         def on_send(node)
-          return unless DEBUGGER_NODES.include?(node)
-          add_offense(node,
-                      :expression,
-                      format(MSG, node.loc.expression.source))
+          return unless debugger_call?(node)
+          add_offense(node, :expression, format(MSG, node.source))
+        end
+
+        def autocorrect(node)
+          lambda do |corrector|
+            if pry_rescue?(node)
+              block = node.parent
+              body  = block.children[2] # (block <send> <parameters> <body>)
+              corrector.replace(block.source_range, body.source)
+            else
+              range = node.source_range
+              range = range_with_surrounding_space(range, :left, nil, false)
+              range = range_with_surrounding_space(range, :right, nil, true)
+              corrector.remove(range)
+            end
+          end
         end
       end
     end

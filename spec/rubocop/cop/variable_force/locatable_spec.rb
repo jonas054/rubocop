@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -17,8 +18,7 @@ describe RuboCop::Cop::VariableForce::Locatable do
   end
 
   let(:ast) do
-    processed_source = RuboCop::ProcessedSource.new(source)
-    processed_source.ast
+    RuboCop::ProcessedSource.new(source, ruby_version).ast
   end
 
   let(:def_node) { ast.each_node.find(&:def_type?) }
@@ -26,6 +26,22 @@ describe RuboCop::Cop::VariableForce::Locatable do
 
   let(:scope) { RuboCop::Cop::VariableForce::Scope.new(def_node) }
   let(:assignment) { LocatableObject.new(lvasgn_node, scope) }
+
+  context 'incomplete implementation' do
+    class IncompleteLocatable
+      include RuboCop::Cop::VariableForce::Locatable
+    end
+
+    it '#node raises an exception' do
+      expect { IncompleteLocatable.new.node }
+        .to raise_error(RuntimeError, '#node must be declared!')
+    end
+
+    it '#scope raises an exception' do
+      expect { IncompleteLocatable.new.scope }
+        .to raise_error(RuntimeError, '#scope must be declared!')
+    end
+  end
 
   describe '#branch_point_node' do
     context 'when it is not in branch' do

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -19,23 +20,10 @@ module RuboCop
 
         def offense?(node)
           # If it's not a string within an interpolation, then it's not an
-          # offense for this cop. A :begin node inside a :dstr node is an
-          # interpolation.
-          begin_found = false
-          return false unless node.each_ancestor.find do |a|
-            begin_found = true if a.type == :begin
-            begin_found && a.type == :dstr
-          end
+          # offense for this cop.
+          return false unless inside_interpolation?(node)
 
-          wrong_quotes?(node, style)
-        end
-
-        def autocorrect(node)
-          @corrections << lambda do |corrector|
-            replacement = node.loc.begin.is?('"') ? "'" : '"'
-            corrector.replace(node.loc.begin, replacement)
-            corrector.replace(node.loc.end, replacement)
-          end
+          wrong_quotes?(node)
         end
       end
     end

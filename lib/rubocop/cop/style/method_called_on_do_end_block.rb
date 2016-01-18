@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,11 +10,11 @@ module RuboCop
       #
       # @example
       #
-      # a do
-      #   b
-      # end.c
+      #   a do
+      #     b
+      #   end.c
       class MethodCalledOnDoEndBlock < Cop
-        MSG = 'Avoid chaining a method call on a do...end block.'
+        MSG = 'Avoid chaining a method call on a do...end block.'.freeze
 
         def on_block(node)
           method, _args, _body = *node
@@ -33,7 +34,7 @@ module RuboCop
 
           range = Parser::Source::Range.new(receiver.loc.end.source_buffer,
                                             receiver.loc.end.begin_pos,
-                                            node.loc.expression.end_pos)
+                                            node.source_range.end_pos)
           add_offense(nil, range)
         end
       end

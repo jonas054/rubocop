@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop checks for underscore-prefixed variables that are actually
       # used.
       class UnderscorePrefixedVariableName < Cop
-        MSG = 'Do not use prefix `_` for a variable that is used.'
+        MSG = 'Do not use prefix `_` for a variable that is used.'.freeze
 
         def join_force?(force_class)
           force_class == VariableForce
@@ -26,7 +27,7 @@ module RuboCop
           node = variable.declaration_node
 
           location = if node.type == :match_with_lvasgn
-                       node.children.first.loc.expression
+                       node.children.first.source_range
                      else
                        node.loc.name
                      end

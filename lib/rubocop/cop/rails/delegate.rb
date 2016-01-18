@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -29,31 +30,27 @@ module RuboCop
       #     foo.bar
       #   end
       class Delegate < Cop
-        include OnMethodDef
+        MSG = 'Use `delegate` to define delegations.'.freeze
 
-        MSG = 'Use `delegate` to define delegations.'
-
-        private
-
-        def on_method_def(node, method_name, args, body)
+        def on_def(node)
+          method_name, args, body = *node
           return unless trivial_delegate?(method_name, args, body)
           return if private_or_protected_delegation(node)
           add_offense(node, :keyword, MSG)
         end
 
-        def autocorrect(node)
-          method_name, args, body = *node
-          return unless trivial_delegate?(method_name, args, body)
-          return if private_or_protected_delegation(node)
+        private
 
+        def autocorrect(node)
+          method_name, _args, body = *node
           delegation = ["delegate :#{body.children[1]}",
                         "to: :#{body.children[0].children[1]}"]
           if method_name == prefixed_method_name(body)
             delegation << ['prefix: true']
           end
 
-          @corrections << lambda do |corrector|
-            corrector.replace(node.loc.expression, delegation.join(', '))
+          lambda do |corrector|
+            corrector.replace(node.source_range, delegation.join(', '))
           end
         end
 

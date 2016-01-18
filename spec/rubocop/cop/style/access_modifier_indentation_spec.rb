@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -70,7 +71,7 @@ describe RuboCop::Cop::Style::AccessModifierIndentation do
                       'end'])
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Indent access modifiers like `private`.'])
-      # No EnforcedStyle can allow both aligments:
+      # No EnforcedStyle can allow both alignments:
       expect(cop.config_to_allow_offenses).to eq('Enabled' => false)
     end
 
@@ -86,7 +87,7 @@ describe RuboCop::Cop::Style::AccessModifierIndentation do
                       'end'])
       expect(cop.offenses.size).to eq(1)
       expect(cop.messages).to eq(['Indent access modifiers like `public`.'])
-      # No EnforcedStyle can allow both aligments:
+      # No EnforcedStyle can allow both alignments:
       expect(cop.config_to_allow_offenses).to eq('Enabled' => false)
     end
 
@@ -234,6 +235,23 @@ describe RuboCop::Cop::Style::AccessModifierIndentation do
                         '    private',
                         '',
                         '    def test; end',
+                        'end'])
+        expect(cop.offenses).to be_empty
+      end
+    end
+
+    context 'when indentation width is overridden for this cop only' do
+      let(:cop_config) do
+        { 'EnforcedStyle' => 'indent', 'IndentationWidth' => 4 }
+      end
+
+      it 'accepts properly indented private' do
+        inspect_source(cop,
+                       ['class Test',
+                        '',
+                        '    private',
+                        '',
+                        '  def test; end',
                         'end'])
         expect(cop.offenses).to be_empty
       end

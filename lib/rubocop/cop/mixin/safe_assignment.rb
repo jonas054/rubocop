@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,21 +7,10 @@ module RuboCop
     # putting parentheses around an assignment to indicate "I know I'm using an
     # assignment as a condition. It's not a mistake."
     module SafeAssignment
-      def safe_assignment?(node)
-        return false unless node.type == :begin
-        return false unless node.children.size == 1
+      extend NodePattern::Macros
 
-        child = node.children.first
-        case child.type
-        when *Util::EQUALS_ASGN_NODES
-          true
-        when :send
-          _receiver, method_name, _args = *child
-          method_name.to_s.end_with?('=')
-        else
-          false
-        end
-      end
+      def_node_matcher :safe_assignment?,
+                       '(begin {equals_asgn? asgn_method_call?})'
 
       def safe_assignment_allowed?
         cop_config['AllowSafeAssignment']

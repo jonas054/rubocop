@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -55,7 +56,7 @@ describe RuboCop::Cop::Style::NegatedIf do
     expect(cop.offenses).to be_empty
   end
 
-  it 'accepts an if where only part of the contition is negated' do
+  it 'accepts an if where only part of the condition is negated' do
     inspect_source(cop,
                    ['if !condition && another_condition',
                     '  some_method',

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -13,7 +14,7 @@ module RuboCop
           class:  0..1,
           sclass: 0..0,
           block:  0..0
-        }
+        }.freeze
 
         attr_reader :node, :variables
 
@@ -33,10 +34,10 @@ module RuboCop
         end
 
         def name
+          # TODO: Add an else clause
           case @node.type
           when :def  then @node.children[0]
           when :defs then @node.children[1]
-          else nil # TODO
           end
         end
 

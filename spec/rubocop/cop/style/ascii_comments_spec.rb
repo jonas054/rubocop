@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -15,8 +16,7 @@ describe RuboCop::Cop::Style::AsciiComments do
   end
 
   it 'accepts comments with only ascii chars' do
-    inspect_source(cop,
-                   ['# AZaz1@$%~,;*_`|'])
+    inspect_source(cop, '# AZaz1@$%~,;*_`|')
     expect(cop.offenses).to be_empty
   end
 end

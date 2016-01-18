@@ -1,23 +1,42 @@
 # encoding: utf-8
+# frozen_string_literal: true
+# rubocop:disable Metrics/ModuleLength
 
 module RuboCop
   module Cop
     # This module contains a collection of useful utility methods.
     module Util
       include PathUtil
-      extend AST::Sexp
+      extend RuboCop::Sexp
 
-      PROC_NEW_NODE = s(:send, s(:const, nil, :Proc), :new)
-      EQUALS_ASGN_NODES = [:lvasgn, :ivasgn, :cvasgn, :gvasgn, :casgn, :masgn]
-      SHORTHAND_ASGN_NODES = [:op_asgn, :or_asgn, :and_asgn]
-      ASGN_NODES = EQUALS_ASGN_NODES + SHORTHAND_ASGN_NODES
+      EQUALS_ASGN_NODES = [:lvasgn, :ivasgn, :cvasgn, :gvasgn,
+                           :casgn, :masgn].freeze
+      SHORTHAND_ASGN_NODES = [:op_asgn, :or_asgn, :and_asgn].freeze
+      ASGN_NODES = (EQUALS_ASGN_NODES + SHORTHAND_ASGN_NODES).freeze
 
       # http://phrogz.net/programmingruby/language.html#table_18.4
       # Backtick is added last just to help editors parse this code.
       OPERATOR_METHODS = %w(
         | ^ & <=> == === =~ > >= < <= << >>
         + - * / % ** ~ +@ -@ [] []= ! != !~
-      ).map(&:to_sym) + [:'`']
+      ).map(&:to_sym).push(:'`').freeze
+
+      STRING_ESCAPES = {
+        '\a' => "\a", '\b' => "\b", '\e' => "\e", '\f' => "\f", '\n' => "\n",
+        '\r' => "\r", '\s' => ' ',  '\t' => "\t", '\v' => "\v", "\\\n" => ''
+      }.freeze
+      STRING_ESCAPE_REGEX = /\\(?:
+                              [abefnrstv\n]    |   # simple escapes (above)
+                              \d{1,3}          |   # octal byte escape
+                              x\d{1,2}         |   # hex byte escape
+                              u[0-9a-fA-F]{4}  |   # unicode char escape
+                              u\{[^}]*\}       |   # extended unicode escape
+                              .                    # any other escaped char
+                            )/x
+
+      # Match literal regex characters, not including anchors, character
+      # classes, alternatives, groups, repetitions, references, etc
+      LITERAL_REGEX = /[\w\s\-,"'!#%&<>=;:`~]|\\[^AbBdDgGkwWszZS0-9]/
 
       module_function
 
@@ -28,12 +47,11 @@ module RuboCop
       def strip_quotes(str)
         if str[0] == '"' || str[0] == "'"
           str[0] = ''
-          str[-1] = ''
         else
           # we're dealing with %q or %Q
           str[0, 3] = ''
-          str[-1] = ''
         end
+        str[-1] = ''
 
         str
       end
@@ -51,7 +69,7 @@ module RuboCop
                        when Parser::Source::Range
                          arg
                        when Parser::AST::Node
-                         arg.loc.expression
+                         arg.source_range
                        else
                          fail ArgumentError, "Invalid argument #{arg}"
                        end
@@ -59,65 +77,20 @@ module RuboCop
         source_range.begin.line..source_range.end.line
       end
 
-      def const_name(node)
-        return nil if node.nil? || node.type != :const
-
-        const_names = []
-        const_node = node
-
-        loop do
-          namespace_node, name = *const_node
-          const_names << name
-          break unless namespace_node
-          break unless namespace_node.is_a?(Parser::AST::Node)
-          break if namespace_node.type == :cbase
-          const_node = namespace_node
-        end
-
-        const_names.reverse.join('::')
-      end
-
-      def command?(name, node)
-        return unless node.type == :send
-
-        receiver, method_name, _args = *node
-
-        # commands have no explicit receiver
-        !receiver && method_name == name
-      end
-
-      def lambda?(node)
-        fail 'Not a block node' unless node.type == :block
-
-        send_node, _block_args, _block_body = *node
-
-        command?(:lambda, send_node)
-      end
-
-      def proc?(node)
-        fail 'Not a block node' unless node.type == :block
-
-        send_node, _block_args, _block_body = *node
-
-        command?(:proc, send_node) || send_node == PROC_NEW_NODE
-      end
-
-      def lambda_or_proc?(node)
-        lambda?(node) || proc?(node)
-      end
-
       def parentheses?(node)
-        node.loc.respond_to?(:end) && node.loc.end
+        node.loc.respond_to?(:end) && node.loc.end &&
+          node.loc.end.is?(')'.freeze)
       end
 
-      def on_node(syms, sexp, excludes = [])
-        yield sexp if Array(syms).include?(sexp.type)
+      def on_node(syms, sexp, excludes = [], &block)
+        return to_enum(:on_node, syms, sexp, excludes) unless block_given?
 
+        yield sexp if Array(syms).include?(sexp.type)
         return if Array(excludes).include?(sexp.type)
 
         sexp.children.each do |elem|
           next unless elem.is_a?(Parser::AST::Node)
-          on_node(syms, elem, excludes) { |s| yield s }
+          on_node(syms, elem, excludes, &block)
         end
       end
 
@@ -141,25 +114,62 @@ module RuboCop
         Parser::Source::Range.new(source_buffer, begin_pos, end_pos)
       end
 
-      def range_with_surrounding_space(range, side = :both)
-        src = @processed_source.buffer.source
-        go_left = side == :left || side == :both
-        go_right = side == :right || side == :both
+      def range_with_surrounding_comma(range, side = :both, buffer = nil)
+        buffer ||= @processed_source.buffer
+        src = buffer.source
+
+        go_left, go_right = directions(side)
+
         begin_pos = range.begin_pos
-        begin_pos -= 1 while go_left && src[begin_pos - 1] =~ /[ \t]/
         end_pos = range.end_pos
-        end_pos += 1 while go_right && src[end_pos] =~ /[ \t]/
-        end_pos += 1 if go_right && src[end_pos] == "\n"
-        Parser::Source::Range.new(@processed_source.buffer, begin_pos, end_pos)
+        begin_pos = move_pos(src, begin_pos, -1, go_left, /,/)
+        end_pos = move_pos(src, end_pos, 1, go_right, /,/)
+
+        Parser::Source::Range.new(buffer, begin_pos, end_pos)
+      end
+
+      def range_with_surrounding_space(range, side = :both, buffer = nil,
+                                       with_newline = true)
+        buffer ||= @processed_source.buffer
+        src = buffer.source
+
+        go_left, go_right = directions(side)
+
+        begin_pos = range.begin_pos
+        end_pos = range.end_pos
+        begin_pos = move_pos(src, begin_pos, -1, go_left, /[ \t]/)
+        begin_pos = move_pos(src, begin_pos, -1, go_left && with_newline, /\n/)
+        end_pos = move_pos(src, end_pos, 1, go_right, /[ \t]/)
+        end_pos = move_pos(src, end_pos, 1, go_right && with_newline, /\n/)
+        Parser::Source::Range.new(buffer, begin_pos, end_pos)
+      end
+
+      def move_pos(src, pos, step, condition, regexp)
+        offset = step == -1 ? -1 : 0
+        pos += step while condition && src[pos + offset] =~ regexp
+        pos
+      end
+
+      def directions(side)
+        if side == :both
+          [true, true]
+        else
+          [side == :left, side == :right]
+        end
       end
 
       def begins_its_line?(range)
-        source_before_end = range.source_buffer.source[0...range.begin_pos]
-        source_before_end =~ /\n\s*\Z/
+        (range.source_line =~ /\S/) == range.column
+      end
+
+      def ends_its_line?(range)
+        line = range.source_buffer.source_line(range.last_line)
+        (line =~ /\s*\z/) == range.last_column
       end
 
       def within_node?(inner, outer)
-        o, i = outer.loc.expression, inner.loc.expression
+        o = outer.is_a?(Node) ? outer.source_range : outer
+        i = inner.is_a?(Node) ? inner.source_range : inner
         i.begin_pos >= o.begin_pos && i.end_pos <= o.end_pos
       end
 
@@ -181,12 +191,73 @@ module RuboCop
         node
       end
 
-      # Range#size is not avaialable prior to Ruby 2.0.
+      # Range#size is not available prior to Ruby 2.0.
       def numeric_range_size(range)
         size = range.end - range.begin
         size += 1 unless range.exclude_end?
         size = 0 if size < 0
         size
+      end
+
+      # If converting a string to Ruby string literal source code, must
+      # double quotes be used?
+      def double_quotes_required?(string)
+        # Double quotes are required for strings which either:
+        # - Contain single quotes
+        # - Contain non-printable characters, which must use an escape
+
+        # Regex matches IF there is a ' or there is a \\ in the string that is
+        # not preceded/followed by another \\ (e.g. "\\x34") but not "\\\\".
+        string.inspect =~ /'|(?<! \\) \\{2}* \\ (?![\\"])/x
+      end
+
+      # If double quoted string literals are found in Ruby code, and they are
+      # not the preferred style, should they be flagged?
+      def double_quotes_acceptable?(string)
+        # If a string literal contains hard-to-type characters which would
+        # not appear on a "normal" keyboard, then double-quotes are acceptable
+        double_quotes_required?(string) ||
+          string.codepoints.any? { |cp| cp < 32 || cp > 126 }
+      end
+
+      def to_string_literal(string)
+        if double_quotes_required?(string)
+          string.inspect
+        else
+          "'#{string.gsub('\\') { '\\\\' }}'"
+        end
+      end
+
+      def to_symbol_literal(string)
+        if string =~ /\s/ || double_quotes_required?(string)
+          ":#{to_string_literal(string)}"
+        else
+          ":#{string}"
+        end
+      end
+
+      # Take a string with embedded escapes, and convert the escapes as the Ruby
+      # interpreter would when reading a double-quoted string literal.
+      # For example, "\\n" will be converted to "\n".
+      def interpret_string_escapes(string)
+        # We currently don't handle \cx, \C-x, and \M-x
+        string.gsub(STRING_ESCAPE_REGEX) do |escape|
+          STRING_ESCAPES[escape] || begin
+            if escape[1] == 'x'
+              [escape[2..-1].hex].pack('C')
+            elsif escape[1] == 'u'
+              if escape[2] == '{'
+                escape[3..-1].split(/\s+/).map(&:hex).pack('U')
+              else
+                [escape[2..-1].hex].pack('U')
+              end
+            elsif escape[1] =~ /\d/ # octal escape
+              [escape[1..-1].to_i(8)].pack('C')
+            else
+              escape[1] # literal escaped char, like \\
+            end
+          end
+        end
       end
     end
   end

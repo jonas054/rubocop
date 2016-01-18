@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -102,9 +103,7 @@ describe RuboCop::Cop::Style::MultilineIfThen do
   end
 
   it 'does not get confused by a postfix unless' do
-    inspect_source(cop,
-                   ['two unless one'
-                   ])
+    inspect_source(cop, 'two unless one')
     expect(cop.offenses).to be_empty
   end
 

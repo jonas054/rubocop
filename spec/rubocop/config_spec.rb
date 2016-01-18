@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -10,12 +11,6 @@ describe RuboCop::Config do
   let(:loaded_path) { 'example/.rubocop.yml' }
 
   describe '#validate', :isolated_environment do
-    # TODO: Because Config.load_file now outputs the validation warning,
-    #       it is inserting text into the rspec test output here.
-    #       The next 2 lines should be removed eventually.
-    before(:each) { $stderr = StringIO.new }
-    after(:each) { $stderr = STDERR }
-
     subject(:configuration) do
       RuboCop::ConfigLoader.load_file(configuration_path)
     end
@@ -25,32 +20,70 @@ describe RuboCop::Config do
     context 'when the configuration includes any unrecognized cop name' do
       before do
         create_file(configuration_path, [
-          'LyneLenth:',
-          '  Enabled: true',
-          '  Max: 100'
-        ])
+                      'LyneLenth:',
+                      '  Enabled: true',
+                      '  Max: 100'
+                    ])
+        $stderr = StringIO.new
+      end
+
+      after do
+        $stderr = STDERR
+      end
+
+      it 'prints a warning message' do
+        configuration # ConfigLoader.load_file will validate config
+        expect($stderr.string).to match(/unrecognized cop LyneLenth/)
+      end
+    end
+
+    context 'when the configuration includes an empty section' do
+      before do
+        create_file(configuration_path, ['Metrics/LineLength:'])
       end
 
       it 'raises validation error' do
         expect { configuration.validate }
-          .to raise_error(described_class::ValidationError,
-                          /^unrecognized cop LyneLenth/)
+          .to raise_error(RuboCop::ValidationError,
+                          %r{^empty section Metrics/LineLength})
+      end
+    end
+
+    context 'when the configuration is in the base RuboCop config folder' do
+      before do
+        create_file(configuration_path, [
+                      'InvalidProperty:',
+                      '  Enabled: true'
+                    ])
+        stub_const('RuboCop::ConfigLoader::RUBOCOP_HOME', rubocop_home_path)
+      end
+
+      let(:rubocop_home_path) { File.realpath('.') }
+      let(:configuration_path) { 'config/.rubocop.yml' }
+
+      it 'is not validated' do
+        expect { configuration.validate }.to_not raise_error
       end
     end
 
     context 'when the configuration includes any unrecognized parameter' do
       before do
         create_file(configuration_path, [
-          'Metrics/LineLength:',
-          '  Enabled: true',
-          '  Min: 10'
-        ])
+                      'Metrics/LineLength:',
+                      '  Enabled: true',
+                      '  Min: 10'
+                    ])
+        $stderr = StringIO.new
       end
 
-      it 'raises validation error' do
-        expect { configuration.validate }
-          .to raise_error(described_class::ValidationError,
-                          /^unrecognized parameter Metrics\/LineLength:Min/)
+      after do
+        $stderr = STDERR
+      end
+
+      it 'prints a warning message' do
+        configuration # ConfigLoader.load_file will validate config
+        expect($stderr.string).to match(
+          %r{unrecognized parameter Metrics/LineLength:Min})
       end
     end
 
@@ -59,17 +92,76 @@ describe RuboCop::Config do
       # configuration, but are nonetheless allowed for any cop.
       before do
         create_file(configuration_path, [
-          'Metrics/LineLength:',
-          '  Exclude:',
-          '    - lib/file.rb',
-          '  Include:',
-          '    - lib/file.xyz',
-          '  Severity: warning'
-        ])
+                      'Metrics/ModuleLength:',
+                      '  Exclude:',
+                      '    - lib/file.rb',
+                      '  Include:',
+                      '    - lib/file.xyz',
+                      '  Severity: warning',
+                      '  StyleGuide: https://example.com/some-style.html'
+                    ])
       end
 
       it 'does not raise validation error' do
         expect { configuration.validate }.to_not raise_error
+      end
+    end
+  end
+
+  describe '#make_excludes_absolute' do
+    context 'when config is in root directory' do
+      let(:hash) do
+        {
+          'AllCops' => {
+            'Exclude' => [
+              'config/environment',
+              'spec'
+            ]
+          }
+        }
+      end
+
+      before do
+        allow(configuration)
+          .to receive(:base_dir_for_path_parameters)
+          .and_return('/home/foo/project')
+        configuration.make_excludes_absolute
+      end
+
+      it 'should generate valid absolute directory' do
+        expect(configuration['AllCops']['Exclude'])
+          .to eq [
+            '/home/foo/project/config/environment',
+            '/home/foo/project/spec'
+          ]
+      end
+    end
+
+    context 'when config is in subdirectory' do
+      let(:hash) do
+        {
+          'AllCops' => {
+            'Exclude' => [
+              '../../config/environment',
+              '../../spec'
+            ]
+          }
+        }
+      end
+
+      before do
+        allow(configuration)
+          .to receive(:base_dir_for_path_parameters)
+          .and_return('/home/foo/project/config/tools')
+        configuration.make_excludes_absolute
+      end
+
+      it 'should generate valid absolute directory' do
+        expect(configuration['AllCops']['Exclude'])
+          .to eq [
+            '/home/foo/project/config/environment',
+            '/home/foo/project/spec'
+          ]
       end
     end
   end
@@ -160,9 +252,9 @@ describe RuboCop::Config do
 
       it 'returns the Include value' do
         expect(patterns_to_include).to eq([
-          '**/Gemfile',
-          'config/unicorn.rb.example'
-        ])
+                                            '**/Gemfile',
+                                            'config/unicorn.rb.example'
+                                          ])
       end
     end
   end
@@ -228,6 +320,40 @@ describe RuboCop::Config do
           expect do |b|
             configuration.deprecation_check(&b)
           end.to yield_with_args(String)
+        end
+      end
+    end
+  end
+
+  describe '#cop_enabled?' do
+    context 'when an entire cop type is disabled' do
+      context 'but an individual cop is enabled' do
+        let(:hash) do
+          {
+            'Style' => { 'Enabled' => false },
+            'Style/TrailingWhitespace' => { 'Enabled' => true }
+          }
+        end
+
+        it 'still disables the cop' do
+          cop_class = RuboCop::Cop::Style::TrailingWhitespace
+          expect(configuration.cop_enabled?(cop_class)).to be false
+        end
+      end
+    end
+
+    context 'when an entire cop type is enabled' do
+      context 'but an individual cop is disabled' do
+        let(:hash) do
+          {
+            'Style' => { 'Enabled' => true },
+            'Style/TrailingWhitespace' => { 'Enabled' => false }
+          }
+        end
+
+        it 'still disables the cop' do
+          cop_class = RuboCop::Cop::Style::TrailingWhitespace
+          expect(configuration.cop_enabled?(cop_class)).to be false
         end
       end
     end

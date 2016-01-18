@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,8 +11,9 @@ module RuboCop
       #
       #   "result is #{something.to_s}"
       class StringConversionInInterpolation < Cop
-        MSG_DEFAULT = 'Redundant use of `Object#to_s` in interpolation.'
-        MSG_SELF = 'Use `self` instead of `Object#to_s` in interpolation.'
+        MSG_DEFAULT = 'Redundant use of `Object#to_s` in interpolation.'.freeze
+        MSG_SELF = 'Use `self` instead of `Object#to_s` in ' \
+                   'interpolation.'.freeze
 
         def on_dstr(node)
           node.children.select { |n| n.type == :begin }.each do |begin_node|
@@ -32,12 +34,12 @@ module RuboCop
         private
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             receiver, _method_name, *_args = *node
             corrector.replace(
-              node.loc.expression,
+              node.source_range,
               if receiver
-                receiver.loc.expression.source
+                receiver.source
               else
                 'self'
               end

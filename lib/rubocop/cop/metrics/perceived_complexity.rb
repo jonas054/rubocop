@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -30,8 +31,9 @@ module RuboCop
         include MethodComplexity
         include IfNode
 
-        MSG = 'Perceived complexity for %s is too high. [%d/%d]'
-        COUNTED_NODES = [:if, :case, :while, :until, :for, :rescue, :and, :or]
+        MSG = 'Perceived complexity for %s is too high. [%d/%d]'.freeze
+        COUNTED_NODES = [:if, :case, :while, :until,
+                         :for, :rescue, :and, :or].freeze
 
         private
 

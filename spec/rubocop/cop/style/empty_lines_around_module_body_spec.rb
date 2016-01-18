@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -74,6 +75,12 @@ describe RuboCop::Cop::Style::EmptyLinesAroundModuleBody, :config do
                                 '  do_something',
                                 '',
                                 'end'].join("\n"))
+    end
+
+    it 'ignores modules with an empty body' do
+      source = "module A\nend"
+      corrected = autocorrect_source(cop, source)
+      expect(corrected).to eq(source)
     end
   end
 end

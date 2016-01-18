@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -18,12 +19,7 @@ module RuboCop
       #   end
       #
       class LiteralInCondition < Cop
-        MSG = 'Literal `%s` appeared in a condition.'
-
-        LITERALS = [:str, :dstr, :int, :float, :array,
-                    :hash, :regexp, :nil, :true, :false]
-
-        BASIC_LITERALS = LITERALS - [:dstr, :array, :hash]
+        MSG = 'Literal `%s` appeared in a condition.'.freeze
 
         def on_if(node)
           check_for_literal(node)
@@ -58,7 +54,7 @@ module RuboCop
         end
 
         def message(node)
-          format(MSG, node.loc.expression.source)
+          format(MSG, node.source)
         end
 
         private
@@ -67,7 +63,7 @@ module RuboCop
           cond, = *node
 
           # if the cond node is literal we obviously have a problem
-          if literal?(cond)
+          if cond.literal?
             add_offense(cond, :expression)
           else
             # alternatively we have to consider a logical node with a
@@ -84,15 +80,11 @@ module RuboCop
           method_name == :!
         end
 
-        def literal?(node)
-          LITERALS.include?(node.type)
-        end
-
         def basic_literal?(node)
           if node && node.type == :array
             primitive_array?(node)
           else
-            BASIC_LITERALS.include?(node.type)
+            node.basic_literal?
           end
         end
 
@@ -119,7 +111,7 @@ module RuboCop
         end
 
         def handle_node(node)
-          if literal?(node)
+          if node.literal?
             add_offense(node, :expression)
           elsif [:send, :and, :or, :begin].include?(node.type)
             check_node(node)

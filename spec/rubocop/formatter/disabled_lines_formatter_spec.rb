@@ -1,7 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'stringio'
 
 module RuboCop
   module Formatter
@@ -26,7 +26,7 @@ module RuboCop
           let(:cop_disabled_line_ranges) { {} }
           it 'does not add to cop_disabled_line_ranges' do
             expect { file_started }.to_not(
-            change { formatter.cop_disabled_line_ranges })
+              change { formatter.cop_disabled_line_ranges })
           end
         end
 
@@ -36,7 +36,7 @@ module RuboCop
           end
           it 'merges the changes into cop_disabled_line_ranges' do
             expect { file_started }.to(
-            change { formatter.cop_disabled_line_ranges })
+              change { formatter.cop_disabled_line_ranges })
           end
         end
       end
@@ -44,22 +44,38 @@ module RuboCop
       describe '#finished' do
         context 'when there disabled cops detected' do
           let(:cop_disabled_line_ranges) do
-            { cop_disabled_line_ranges: { 'LineLength' => [1..1] } }
+            {
+              cop_disabled_line_ranges: {
+                'LineLength' => [1..1],
+                'ClassLength' => [1..Float::INFINITY]
+              }
+            }
           end
+          let(:offenses) do
+            [
+              Cop::Offense.new(:convention, location, 'Class too long.',
+                               'ClassLength', :disabled),
+              Cop::Offense.new(:convention, location, 'Line too long.',
+                               'LineLength', :uncorrected)
+            ]
+          end
+          let(:location) { OpenStruct.new(line: 3) }
 
           before do
             formatter.started(files)
             formatter.file_started('lib/rubocop.rb', cop_disabled_line_ranges)
+            formatter.file_finished('lib/rubocop.rb', offenses)
           end
 
           it 'lists disabled cops by file' do
             formatter.finished(files)
-            expect(output.string).to eq(
-            ['',
-             'Cops disabled line ranges:',
-             '',
-             'lib/rubocop.rb:1..1: LineLength',
-             ''].join("\n"))
+            expect(output.string)
+              .to eq(['',
+                      'Cops disabled line ranges:',
+                      '',
+                      'lib/rubocop.rb:1..1: LineLength',
+                      'lib/rubocop.rb:1..Infinity: ClassLength',
+                      ''].join("\n"))
           end
         end
       end

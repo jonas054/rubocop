@@ -1,7 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'stringio'
 
 module RuboCop
   describe Formatter::JSONFormatter do
@@ -15,7 +15,7 @@ module RuboCop
     end
     let(:offense) do
       Cop::Offense.new(:convention, location,
-                       'This is message', 'CopName', true)
+                       'This is message', 'CopName', :corrected)
     end
 
     describe '#started' do
@@ -44,8 +44,8 @@ module RuboCop
         formatter.file_started(files[0], {})
         expect(summary[:offense_count]).to eq(0)
         formatter.file_finished(files[0], [
-          double('offense1'), double('offense2')
-        ])
+                                  double('offense1'), double('offense2')
+                                ])
         expect(summary[:offense_count]).to eq(2)
       end
 
@@ -121,14 +121,8 @@ module RuboCop
         expect(hash[:corrected]).to be_truthy
       end
 
-      before do
-        allow(formatter)
-          .to receive(:hash_for_location).and_return(location_hash)
-      end
-
-      let(:location_hash) { { line: 1, column: 2 } }
-
       it 'sets value of #hash_for_location for :location key' do
+        location_hash = { line: 3, column: 6, length: 1 }
         expect(hash[:location]).to eq(location_hash)
       end
     end

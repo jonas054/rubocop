@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,7 +10,7 @@ module RuboCop
         include SurroundingSpace
         include ConfigurableEnforcedStyle
 
-        MSG = 'Space inside %s.'
+        MSG = 'Space inside %s.'.freeze
 
         def on_hash(node)
           b_ix = index_of_first_token(node)
@@ -19,6 +20,8 @@ module RuboCop
           return unless tokens[b_ix].type == :tLBRACE
 
           e_ix = index_of_last_token(node)
+          return unless tokens[e_ix].type == :tRCURLY
+
           check(tokens[b_ix], tokens[b_ix + 1])
           check(tokens[e_ix - 1], tokens[e_ix]) unless b_ix == e_ix - 1
         end
@@ -68,7 +71,7 @@ module RuboCop
         end
 
         def autocorrect(range)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             # It is possible that BracesAroundHashParameters will remove the
             # braces while this cop inserts spaces. This can lead to unwanted
             # changes to the inspected code. If we replace the brace with a

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -19,7 +20,7 @@ describe RuboCop::Cop::Style::SpaceInsideParens do
   end
 
   it 'accepts parentheses with no spaces' do
-    inspect_source(cop, ['split("\n")'])
+    inspect_source(cop, 'split("\n")')
     expect(cop.messages).to be_empty
   end
 

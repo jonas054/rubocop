@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -13,9 +14,9 @@ module RuboCop
       #  # good
       #  if x.nil?
       class NilComparison < Cop
-        MSG = 'Prefer the use of the `nil?` predicate.'
+        MSG = 'Prefer the use of the `nil?` predicate.'.freeze
 
-        OPS = [:==, :===]
+        OPS = [:==, :===].freeze
 
         NIL_NODE = s(:nil)
 
@@ -29,11 +30,8 @@ module RuboCop
         private
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            expr = node.loc.expression
-            new_code = expr.source.sub(/\s*={2,3}\s*nil/, '.nil?')
-            corrector.replace(expr, new_code)
-          end
+          new_code = node.source.sub(/\s*={2,3}\s*nil/, '.nil?')
+          ->(corrector) { corrector.replace(node.source_range, new_code) }
         end
       end
     end

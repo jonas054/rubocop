@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,9 +10,9 @@ module RuboCop
       #
       #  x.top >= x.top
       class UselessComparison < Cop
-        MSG = 'Comparison of something with itself detected.'
+        MSG = 'Comparison of something with itself detected.'.freeze
 
-        OPS = %w(== === != < > <= >= <=>)
+        OPS = %w(== === != < > <= >= <=>).freeze
 
         def on_send(node)
           # lambda.() does not have a selector

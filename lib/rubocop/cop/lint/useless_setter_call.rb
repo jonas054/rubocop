@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -15,26 +16,19 @@ module RuboCop
       class UselessSetterCall < Cop
         include OnMethodDef
 
-        MSG = 'Useless setter call to local variable `%s`.'
+        MSG = 'Useless setter call to local variable `%s`.'.freeze
         ASSIGNMENT_TYPES = [:lvasgn, :ivasgn, :cvasgn, :gvasgn].freeze
-        LITERAL_TYPES = [
-          :true, :false, :nil,
-          :int, :float,
-          :str, :dstr, :sym, :dsym, :xstr, :regexp,
-          :array, :hash,
-          :irange, :erange
-        ].freeze
 
         private
 
         def on_method_def(_node, _method_name, _args, body)
           return unless body
 
-          if body.type == :begin
-            expression = body.children
-          else
-            expression = body
-          end
+          expression = if body.type == :begin
+                         body.children
+                       else
+                         body
+                       end
 
           last_expr = expression.is_a?(Array) ? expression.last : expression
 
@@ -80,7 +74,7 @@ module RuboCop
                 process_binary_operator_assignment(node)
               when *ASSIGNMENT_TYPES
                 _, rhs_node = *node
-                process_assignment(node, rhs_node)
+                process_assignment(node, rhs_node) if rhs_node
               end
             end
 
@@ -136,16 +130,16 @@ module RuboCop
           def process_assignment(asgn_node, rhs_node)
             lhs_variable_name, = *asgn_node
 
-            if [:lvar, :ivar, :cvar, :gvar].include?(rhs_node.type)
-              rhs_variable_name, = *rhs_node
-              @local[lhs_variable_name] = @local[rhs_variable_name]
-            else
-              @local[lhs_variable_name] = constructor?(rhs_node)
-            end
+            @local[lhs_variable_name] = if rhs_node.variable?
+                                          rhs_variable_name, = *rhs_node
+                                          @local[rhs_variable_name]
+                                        else
+                                          constructor?(rhs_node)
+                                        end
           end
 
           def constructor?(node)
-            return true if LITERAL_TYPES.include?(node.type)
+            return true if node.literal?
             return false unless node.type == :send
             _receiver, method = *node
             method == :new

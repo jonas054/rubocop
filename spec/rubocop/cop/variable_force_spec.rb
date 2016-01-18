@@ -1,10 +1,11 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'astrolabe/sexp'
+require 'rubocop/ast_node/sexp'
 
 describe RuboCop::Cop::VariableForce do
-  include Astrolabe::Sexp
+  include RuboCop::Sexp
 
   subject(:force) { described_class.new([]) }
 

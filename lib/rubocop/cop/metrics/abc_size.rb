@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -9,17 +10,29 @@ module RuboCop
       class AbcSize < Cop
         include MethodComplexity
 
-        MSG = 'Assignment Branch Condition size for %s is too high. [%.4g/%.4g]'
-        BRANCH_NODES = [:send]
-        CONDITION_NODES = CyclomaticComplexity::COUNTED_NODES
+        MSG = 'Assignment Branch Condition size for %s is too high. ' \
+              '[%.4g/%.4g]'.freeze
+        BRANCH_NODES = [:send].freeze
+        CONDITION_NODES = CyclomaticComplexity::COUNTED_NODES.freeze
 
         private
 
         def complexity(node)
-          a = node.each_node(ASGN_NODES).count
-          b = node.each_node(BRANCH_NODES).count
-          c = node.each_node(CONDITION_NODES).count
-          Math.sqrt(a**2 + b**2 + c**2).round(2)
+          assignment = 0
+          branch = 0
+          condition = 0
+
+          node.each_node do |child|
+            if child.assignment?
+              assignment += 1
+            elsif BRANCH_NODES.include?(child.type)
+              branch += 1
+            elsif CONDITION_NODES.include?(child.type)
+              condition += 1
+            end
+          end
+
+          Math.sqrt(assignment**2 + branch**2 + condition**2).round(2)
         end
       end
     end

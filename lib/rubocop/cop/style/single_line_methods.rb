@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,9 +7,10 @@ module RuboCop
       # This cop checks for single-line method definitions.
       # It can optionally accept single-line methods with no body.
       class SingleLineMethods < Cop
+        include AutocorrectAlignment
         include OnMethodDef
 
-        MSG = 'Avoid single-line method definitions.'
+        MSG = 'Avoid single-line method definitions.'.freeze
 
         def allow_empty?
           cop_config['AllowIfMethodIsEmpty']
@@ -30,15 +32,17 @@ module RuboCop
         def autocorrect(node)
           body = @body
           eol_comment = processed_source.comments.find do |c|
-            c.loc.line == node.loc.expression.line
+            c.loc.line == node.source_range.line
           end
-          @corrections << lambda do |corrector|
-            if body.type == :begin
-              body.children.each do |part|
-                break_line_before(part.loc.expression, node, corrector, 1)
+          lambda do |corrector|
+            if body
+              if body.type == :begin
+                body.children.each do |part|
+                  break_line_before(part.source_range, node, corrector, 1)
+                end
+              else
+                break_line_before(body.source_range, node, corrector, 1)
               end
-            else
-              break_line_before(body.loc.expression, node, corrector, 1)
             end
 
             break_line_before(node.loc.end, node, corrector, 0)
@@ -55,15 +59,10 @@ module RuboCop
           )
         end
 
-        def configured_indentation_width
-          config.for_cop('IndentationWidth')['Width']
-        end
-
         def move_comment(eol_comment, node, corrector)
           text = eol_comment.loc.expression.source
-          corrector.insert_before(node.loc.expression,
-                                  text + "\n" +
-                                  ' ' * node.loc.keyword.column)
+          corrector.insert_before(node.source_range,
+                                  text + "\n" + (' ' * node.loc.keyword.column))
           corrector.remove(eol_comment.loc.expression)
         end
       end

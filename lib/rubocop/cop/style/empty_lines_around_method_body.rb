@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -17,12 +18,12 @@ module RuboCop
         include EmptyLinesAroundBody
         include OnMethodDef
 
-        KIND = 'method'
+        KIND = 'method'.freeze
 
         private
 
-        def on_method_def(node, _method_name, _args, _body)
-          check(node)
+        def on_method_def(node, _method_name, _args, body)
+          check(node, body)
         end
 
         # Override ConfigurableEnforcedStyle#style and hard-code

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -14,9 +15,9 @@ module RuboCop
         end
 
         def handle(node)
-          length = node.loc.expression.source.lines.to_a.size
+          length = node.source.lines.to_a.size
           return unless length > 1
-          return unless  node.loc.begin && node.loc.begin.is?('do')
+          return unless node.loc.begin && node.loc.begin.is?('do')
 
           add_offense(node, :begin, error_message(node.type))
         end
@@ -28,13 +29,11 @@ module RuboCop
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            condition_node, = *node
-            end_of_condition_range = condition_node.loc.expression.end
-            do_range = node.loc.begin
-            whitespaces_and_do_range = end_of_condition_range.join(do_range)
-            corrector.remove(whitespaces_and_do_range)
-          end
+          condition_node, = *node
+          end_of_condition_range = condition_node.source_range.end
+          do_range = node.loc.begin
+          whitespaces_and_do_range = end_of_condition_range.join(do_range)
+          ->(corrector) { corrector.remove(whitespaces_and_do_range) }
         end
       end
     end

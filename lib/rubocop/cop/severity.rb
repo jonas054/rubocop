@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,11 +8,11 @@ module RuboCop
       include Comparable
 
       # @api private
-      NAMES = [:refactor, :convention, :warning, :error, :fatal]
+      NAMES = [:refactor, :convention, :warning, :error, :fatal].freeze
 
       # @api private
       CODE_TABLE = { R: :refactor, C: :convention,
-                     W: :warning, E: :error, F: :fatal }
+                     W: :warning, E: :error, F: :fatal }.freeze
 
       # @api public
       #
@@ -55,11 +56,11 @@ module RuboCop
 
       # @api private
       def ==(other)
-        if other.is_a?(Symbol)
-          @name == other
-        else
-          @name == other.name
-        end
+        @name == if other.is_a?(Symbol)
+                   other
+                 else
+                   other.name
+                 end
       end
 
       # @api private

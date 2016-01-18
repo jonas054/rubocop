@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
       class ParameterLists < Cop
         include ConfigurableMax
 
-        MSG = 'Avoid parameter lists longer than %d parameters.'
+        MSG = 'Avoid parameter lists longer than %d parameters.'.freeze
 
         def on_args(node)
           count = args_count(node)
@@ -27,7 +28,7 @@ module RuboCop
           if count_keyword_args?
             node.children.size
           else
-            node.children.reject { |a| a.type == :kwoptarg }.size
+            node.children.count { |a| ![:kwoptarg, :kwarg].include?(a.type) }
           end
         end
 

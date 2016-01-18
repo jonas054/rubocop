@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,11 +9,11 @@ module RuboCop
       module EmptyLinesAroundBody
         include ConfigurableEnforcedStyle
 
-        MSG_EXTRA = 'Extra empty line detected at %s body %s.'
-        MSG_MISSING = 'Empty line missing at %s body %s.'
+        MSG_EXTRA = 'Extra empty line detected at %s body %s.'.freeze
+        MSG_MISSING = 'Empty line missing at %s body %s.'.freeze
 
         def autocorrect(range)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             case style
             when :no_empty_lines then corrector.remove(range)
             when :empty_lines    then corrector.insert_before(range, "\n")
@@ -22,10 +23,14 @@ module RuboCop
 
         private
 
-        def check(node)
+        def check(node, body)
+          # When style is `empty_lines`, if the body is empty, we don't enforce
+          # the presence OR absence of an empty line
+          # But if style is `no_empty_lines`, there must not be an empty line
+          return unless body || style == :no_empty_lines
+
           start_line = node.loc.keyword.line
           end_line = node.loc.end.line
-
           return if start_line == end_line
 
           check_source(start_line, end_line)
@@ -34,9 +39,7 @@ module RuboCop
         def check_source(start_line, end_line)
           case style
           when :no_empty_lines
-            check_both(start_line, end_line, MSG_EXTRA) do |line|
-              line.empty?
-            end
+            check_both(start_line, end_line, MSG_EXTRA, &:empty?)
           when :empty_lines
             check_both(start_line, end_line, MSG_MISSING) do |line|
               !line.empty?

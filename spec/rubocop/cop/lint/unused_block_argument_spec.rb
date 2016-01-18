@@ -1,8 +1,9 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
-describe RuboCop::Cop::Lint::UnusedBlockArgument do
+describe RuboCop::Cop::Lint::UnusedBlockArgument, :config do
   subject(:cop) { described_class.new }
 
   context 'inspection' do
@@ -113,7 +114,7 @@ describe RuboCop::Cop::Lint::UnusedBlockArgument do
         end
       end
 
-      context 'and an arguments is unused' do
+      context 'and an argument is unused' do
         let(:source) { <<-END }
           -> (foo, bar) { puts bar }
         END
@@ -165,6 +166,50 @@ describe RuboCop::Cop::Lint::UnusedBlockArgument do
         expect(cop.offenses).to be_empty
       end
     end
+
+    context 'in a method calling `binding` without arguments' do
+      let(:source) { <<-END }
+        test do |key, value|
+          puts something(binding)
+        end
+      END
+
+      it 'accepts all arguments' do
+        expect(cop.offenses).to be_empty
+      end
+
+      context 'inside a method definition' do
+        let(:source) { <<-END }
+          test do |key, value|
+            def other(a)
+              puts something(binding)
+            end
+          end
+        END
+
+        it 'registers offenses' do
+          expect(cop.offenses.size).to eq 2
+          expect(cop.offenses.first.line).to eq(1)
+          expect(cop.highlights).to eq(%w(key value))
+        end
+      end
+    end
+
+    context 'in a method calling `binding` with arguments' do
+      context 'when a method argument is unused' do
+        let(:source) { <<-END }
+          test do |key, value|
+            puts something(binding(:other))
+          end
+        END
+
+        it 'registers an offense' do
+          expect(cop.offenses.size).to eq(2)
+          expect(cop.offenses.first.line).to eq(1)
+          expect(cop.highlights).to eq(%w(key value))
+        end
+      end
+    end
   end
 
   context 'auto-correct' do
@@ -172,20 +217,20 @@ describe RuboCop::Cop::Lint::UnusedBlockArgument do
       expect(autocorrect_source(cop, <<-SOURCE
       arr.map { |foo| stuff }
       SOURCE
-      )).to eq(<<-CORRECTED_SOURCE
+                               )).to eq(<<-CORRECTED_SOURCE
       arr.map { |_foo| stuff }
       CORRECTED_SOURCE
-      )
+                                       )
     end
 
     it 'fixes multiple' do
       expect(autocorrect_source(cop, <<-SOURCE
       hash.map { |key, val| stuff }
       SOURCE
-      )).to eq(<<-CORRECTED_SOURCE
+                               )).to eq(<<-CORRECTED_SOURCE
       hash.map { |_key, _val| stuff }
       CORRECTED_SOURCE
-      )
+                                       )
     end
 
     it 'preserves whitespace' do
@@ -193,31 +238,31 @@ describe RuboCop::Cop::Lint::UnusedBlockArgument do
       hash.map { |key,
                   val| stuff }
       SOURCE
-      )).to eq(<<-CORRECTED_SOURCE
+                               )).to eq(<<-CORRECTED_SOURCE
       hash.map { |_key,
                   _val| stuff }
       CORRECTED_SOURCE
-      )
+                                       )
     end
 
     it 'preserves splat' do
       expect(autocorrect_source(cop, <<-SOURCE
       obj.method { |foo, *bars, baz| stuff(foo, baz) }
       SOURCE
-      )).to eq(<<-CORRECTED_SOURCE
+                               )).to eq(<<-CORRECTED_SOURCE
       obj.method { |foo, *_bars, baz| stuff(foo, baz) }
       CORRECTED_SOURCE
-      )
+                                       )
     end
 
     it 'preserves default' do
       expect(autocorrect_source(cop, <<-SOURCE
       obj.method { |foo, bar = baz| stuff(foo) }
       SOURCE
-      )).to eq(<<-CORRECTED_SOURCE
+                               )).to eq(<<-CORRECTED_SOURCE
       obj.method { |foo, _bar = baz| stuff(foo) }
       CORRECTED_SOURCE
-      )
+                                       )
     end
 
     it 'ignores used' do
@@ -226,6 +271,31 @@ describe RuboCop::Cop::Lint::UnusedBlockArgument do
       SOURCE
 
       expect(autocorrect_source(cop, original_source)).to eq(original_source)
+    end
+  end
+
+  context 'when IgnoreEmptyBlocks config parameter is set' do
+    subject(:cop) { described_class.new(config) }
+    let(:cop_config) { { 'IgnoreEmptyBlocks' => true } }
+
+    it 'accepts an empty block with a single unused parameter' do
+      inspect_source(cop, '->(arg) { }')
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for a non-empty block with an unused parameter' do
+      inspect_source(cop, '->(arg) { 1 }')
+      expect(cop.offenses.size).to eq 1
+    end
+
+    it 'accepts an empty block with multiple unused parameters' do
+      inspect_source(cop, '->(arg1, arg2, *others) { }')
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'registers an offense for a non-empty block with multiple unused args' do
+      inspect_source(cop, '->(arg1, arg2, *others) { 1 }')
+      expect(cop.offenses.size).to eq 3
     end
   end
 end

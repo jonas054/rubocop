@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop checks for *rescue* blocks targeting the Exception class.
       class RescueException < Cop
         MSG = 'Avoid rescuing the `Exception` class. ' \
-              'Perhaps you meant to rescue `StandardError`?'
+              'Perhaps you meant to rescue `StandardError`?'.freeze
 
         def on_resbody(node)
           return unless node.children.first
@@ -17,7 +18,7 @@ module RuboCop
         end
 
         def targets_exception?(rescue_arg_node)
-          Util.const_name(rescue_arg_node) == 'Exception'
+          rescue_arg_node.const_name == 'Exception'
         end
       end
     end

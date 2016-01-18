@@ -1,9 +1,14 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # The CLI is a class responsible of handling all the command line interface
   # logic.
   class CLI
+    include Formatter::TextUtil
+
+    class Finished < Exception; end
+
     attr_reader :options, :config_store
 
     def initialize
@@ -18,21 +23,25 @@ module RuboCop
     def run(args = ARGV)
       @options, paths = Options.new.parse(args)
       act_on_options
+      apply_default_formatter
 
       runner = Runner.new(@options, @config_store)
       trap_interrupt(runner)
       all_passed = runner.run(paths)
+      display_warning_summary(runner.warnings)
       display_error_summary(runner.errors)
+      maybe_print_corrected_source
 
-      all_passed && !runner.aborting? ? 0 : 1
-    rescue Cop::AmbiguousCopName => e
-      $stderr.puts "Ambiguous cop name #{e.message} needs namespace " \
-                   'qualifier.'
-      return 1
-    rescue => e
+      all_passed && !runner.aborting? && runner.errors.empty? ? 0 : 1
+    rescue RuboCop::Error => e
+      $stderr.puts Rainbow("Error: #{e.message}").red
+      return 2
+    rescue Finished
+      return 0
+    rescue StandardError, SyntaxError => e
       $stderr.puts e.message
       $stderr.puts e.backtrace
-      return 1
+      return 2
     end
 
     def trap_interrupt(runner)
@@ -54,7 +63,13 @@ module RuboCop
 
       @config_store.options_config = @options[:config] if @options[:config]
 
-      Rainbow.enabled = false unless @options[:color]
+      if @options[:color]
+        # color output explicitly forced on
+        Rainbow.enabled = true
+      elsif @options[:color] == false
+        # color output explicitly forced off
+        Rainbow.enabled = false
+      end
     end
 
     def handle_exiting_options
@@ -63,7 +78,22 @@ module RuboCop
       puts RuboCop::Version.version(false) if @options[:version]
       puts RuboCop::Version.version(true) if @options[:verbose_version]
       print_available_cops if @options[:show_cops]
-      exit(0)
+      fail Finished
+    end
+
+    def apply_default_formatter
+      # This must be done after the options have already been processed,
+      # because they can affect how ConfigStore behaves
+      @options[:formatters] ||= begin
+        cfg = @config_store.for(Dir.pwd)['AllCops']
+        formatter = (cfg && cfg['DefaultFormatter']) || 'progress'
+        [[formatter, @options[:output_path]]]
+      end
+
+      if @options[:auto_gen_config]
+        @options[:formatters] << [Formatter::DisabledConfigFormatter,
+                                  ConfigLoader::AUTO_GENERATED_FILE]
+      end
     end
 
     def print_available_cops
@@ -91,17 +121,24 @@ module RuboCop
       selected_cops.each do |cop|
         puts '# Supports --auto-correct' if cop.new.support_autocorrect?
         puts "#{cop.cop_name}:"
-        cnf = @config_store.for(Dir.pwd.to_s).for_cop(cop)
-        puts cnf.to_yaml.lines.to_a[1..-1].map { |line| '  ' + line }
+        cnf = @config_store.for(Dir.pwd).for_cop(cop)
+        puts cnf.to_yaml.lines.to_a.butfirst.map { |line| '  ' + line }
         puts
       end
+    end
+
+    def display_warning_summary(warnings)
+      return if warnings.empty?
+
+      warn Rainbow("\n#{pluralize(warnings.size, 'warning')}:").yellow
+
+      warnings.each { |warning| warn warning }
     end
 
     def display_error_summary(errors)
       return if errors.empty?
 
-      plural = errors.count > 1 ? 's' : ''
-      warn "\n#{errors.count} error#{plural} occurred:".color(:red)
+      warn Rainbow("\n#{pluralize(errors.size, 'error')} occurred:").red
 
       errors.each { |error| warn error }
 
@@ -111,6 +148,17 @@ module RuboCop
         Mention the following information in the issue report:
         #{RuboCop::Version.version(true)}
       END
+    end
+
+    def maybe_print_corrected_source
+      # If we are asked to autocorrect source code read from stdin, the only
+      # reasonable place to write it is to stdout
+      # Unfortunately, we also write other information to stdout
+      # So a delimiter is needed for tools to easily identify where the
+      # autocorrected source begins
+      return unless @options[:stdin] && @options[:auto_correct]
+      puts '=' * 20
+      print @options[:stdin]
     end
   end
 end

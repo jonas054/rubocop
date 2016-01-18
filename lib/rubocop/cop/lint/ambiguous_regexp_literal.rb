@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -19,7 +20,7 @@ module RuboCop
 
         MSG = 'Ambiguous regexp literal. Parenthesize the method arguments ' \
               "if it's surely a regexp literal, or add a whitespace to the " \
-              'right of the `/` if it should be a division.'
+              'right of the `/` if it should be a division.'.freeze
 
         private
 

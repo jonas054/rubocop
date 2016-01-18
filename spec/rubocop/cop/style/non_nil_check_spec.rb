@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -79,6 +80,14 @@ describe RuboCop::Cop::Style::NonNilCheck, :config do
       corrected = autocorrect_source(cop, '!nil?')
       expect(corrected).to eq '!nil?'
     end
+
+    it 'does not report corrected when the code was not modified' do
+      source = 'return nil unless (line =~ //) != nil'
+      corrected = autocorrect_source(cop, source)
+
+      expect(corrected).to eq(source)
+      expect(cop.corrections).to be_empty
+    end
   end
 
   context 'when allowing semantic changes' do
@@ -127,6 +136,14 @@ describe RuboCop::Cop::Style::NonNilCheck, :config do
     it 'does not blow up when autocorrecting implicit receiver' do
       corrected = autocorrect_source(cop, '!nil?')
       expect(corrected).to eq 'self'
+    end
+
+    it 'corrects code that would not be modified if ' \
+       'IncludeSemanticChanges were false' do
+      corrected = autocorrect_source(cop,
+                                     'return nil unless (line =~ //) != nil')
+
+      expect(corrected).to eq('return nil unless (line =~ //)')
     end
   end
 end

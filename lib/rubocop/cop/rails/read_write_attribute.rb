@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -16,7 +17,7 @@ module RuboCop
       #   x = self[:attr]
       #   self[:attr] = val
       class ReadWriteAttribute < Cop
-        MSG = 'Prefer `%s` over `%s`.'
+        MSG = 'Prefer `%s` over `%s`.'.freeze
 
         def on_send(node)
           receiver, method_name, *_args = *node
@@ -33,8 +34,36 @@ module RuboCop
           if method_name == :read_attribute
             format(MSG, 'self[:attr]', 'read_attribute(:attr)')
           else
-            format(MSG, 'self[:attr] = val', 'write_attribute(:attr, var)')
+            format(MSG, 'self[:attr] = val', 'write_attribute(:attr, val)')
           end
+        end
+
+        def autocorrect(node)
+          _receiver, method_name, _body = *node
+
+          case method_name
+          when :read_attribute
+            replacement = read_attribute_replacement(node)
+          when :write_attribute
+            replacement = write_attribute_replacement(node)
+          end
+
+          ->(corrector) { corrector.replace(node.source_range, replacement) }
+        end
+
+        private
+
+        def read_attribute_replacement(node)
+          _receiver, _method_name, body = *node
+
+          "self[#{body.source}]"
+        end
+
+        def write_attribute_replacement(node)
+          _receiver, _method_name, *args = *node
+          name, value = *args
+
+          "self[#{name.source}] = #{value.source}"
         end
       end
     end

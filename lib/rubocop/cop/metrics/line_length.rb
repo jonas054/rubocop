@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'uri'
 
@@ -10,11 +11,16 @@ module RuboCop
       class LineLength < Cop
         include ConfigurableMax
 
-        MSG = 'Line is too long. [%d/%d]'
+        MSG = 'Line is too long. [%d/%d]'.freeze
 
         def investigate(processed_source)
+          heredocs = extract_heredocs(processed_source.ast) if allow_heredoc?
           processed_source.lines.each_with_index do |line, index|
             next unless line.length > max
+
+            if allow_heredoc?
+              next if line_in_whitelisted_heredoc?(heredocs, index.succ)
+            end
 
             if allow_uri?
               uri_range = find_excessive_uri_range(line)
@@ -40,6 +46,31 @@ module RuboCop
           cop_config['Max']
         end
 
+        def allow_heredoc?
+          allowed_heredoc
+        end
+
+        def allowed_heredoc
+          cop_config['AllowHeredoc']
+        end
+
+        def extract_heredocs(ast)
+          return [] unless ast
+          ast.each_node.with_object([]) do |node, heredocs|
+            next unless node.location.is_a?(Parser::Source::Map::Heredoc)
+            body = node.location.heredoc_body
+            delimiter = node.location.heredoc_end.source.strip
+            heredocs << [body.first_line...body.last_line, delimiter]
+          end
+        end
+
+        def line_in_whitelisted_heredoc?(heredocs, line_number)
+          heredocs.any? do |range, delimiter|
+            range.cover?(line_number) &&
+              (allowed_heredoc == true || allowed_heredoc.include?(delimiter))
+          end
+        end
+
         def allow_uri?
           cop_config['AllowURI']
         end
@@ -58,18 +89,9 @@ module RuboCop
 
         def match_uris(string)
           matches = []
-          unscanned_position = 0
-
-          loop do
-            match_data = string.match(uri_regexp, unscanned_position)
-            break unless match_data
-
-            uri_ish_string = match_data[0]
-            matches << match_data if valid_uri?(uri_ish_string)
-
-            _, unscanned_position = match_data.offset(0)
+          string.scan(uri_regexp) do
+            matches << $LAST_MATCH_INFO if valid_uri?($LAST_MATCH_INFO[0])
           end
-
           matches
         end
 
@@ -81,7 +103,7 @@ module RuboCop
         end
 
         def uri_regexp
-          URI.regexp(cop_config['URISchemes'])
+          @regexp ||= URI.regexp(cop_config['URISchemes'])
         end
       end
     end

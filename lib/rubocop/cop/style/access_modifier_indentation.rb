@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
         include ConfigurableEnforcedStyle
         include AccessModifierNode
 
-        MSG = '%s access modifiers like `%s`.'
+        MSG = '%s access modifiers like `%s`.'.freeze
 
         def on_class(node)
           _name, _base_class, body = *node
@@ -29,7 +30,7 @@ module RuboCop
 
         def on_block(node)
           _method, _args, body = *node
-          check_body(body, node) if class_constructor?(node)
+          check_body(body, node) if node.class_constructor?
         end
 
         private
@@ -38,13 +39,13 @@ module RuboCop
           return if body.nil? # Empty class etc.
 
           modifiers = body.children.select { |c| modifier_node?(c) }
-          class_column = node.loc.expression.column
+          class_column = node.source_range.column
 
           modifiers.each { |modifier| check_modifier(modifier, class_column) }
         end
 
         def check_modifier(send_node, class_start_col)
-          access_modifier_start_col = send_node.loc.expression.column
+          access_modifier_start_col = send_node.source_range.column
           offset = access_modifier_start_col - class_start_col
 
           @column_delta = expected_indent_offset - offset
@@ -63,13 +64,6 @@ module RuboCop
 
         def message(node)
           format(MSG, style.capitalize, node.loc.selector.source)
-        end
-
-        def class_constructor?(block_node)
-          send_node = block_node.children.first
-          receiver_node, method_name, *_ = *send_node
-          return false unless method_name == :new
-          %w(Class Module).include?(Util.const_name(receiver_node))
         end
 
         def expected_indent_offset

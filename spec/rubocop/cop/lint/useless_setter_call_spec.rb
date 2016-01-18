@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -164,7 +165,7 @@ describe RuboCop::Cop::Lint::UselessSetterCall do
     end
   end
 
-  context 'when a lvar contains a local object instanciated with literal' do
+  context 'when a lvar contains a local object instantiated with literal' do
     it 'registers an offense for the setter call on the lvar' do
       inspect_source(cop,
                      ['def test',
@@ -192,6 +193,18 @@ describe RuboCop::Cop::Lint::UselessSetterCall do
     inspect_source(cop,
                    ['def test',
                     '  top.attr == 5',
+                    'end'
+                   ])
+    expect(cop.offenses).to be_empty
+  end
+
+  it 'handles exception assignments without exploding' do
+    inspect_source(cop,
+                   ['def foo(bar)',
+                    '  begin',
+                    '  rescue StandardError => _',
+                    '  end',
+                    '  bar[:baz] = true',
                     'end'
                    ])
     expect(cop.offenses).to be_empty

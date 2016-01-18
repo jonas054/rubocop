@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -18,12 +19,12 @@ describe RuboCop::Cop::Style::WhileUntilDo do
   end
 
   it 'accepts do in single-line while' do
-    inspect_source(cop, ['while cond do something end'])
+    inspect_source(cop, 'while cond do something end')
     expect(cop.offenses).to be_empty
   end
 
   it 'accepts do in single-line until' do
-    inspect_source(cop, ['until cond do something end'])
+    inspect_source(cop, 'until cond do something end')
     expect(cop.offenses).to be_empty
   end
 

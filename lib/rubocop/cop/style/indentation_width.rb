@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,12 +8,13 @@ module RuboCop
       #
       # @example
       #
-      # class A
-      #  def test
-      #   puts 'hello'
-      #  end
-      # end
+      #   class A
+      #    def test
+      #     puts 'hello'
+      #    end
+      #   end
       class IndentationWidth < Cop # rubocop:disable Metrics/ClassLength
+        include EndKeywordAlignment
         include AutocorrectAlignment
         include OnMethodDef
         include CheckAssignment
@@ -51,22 +53,50 @@ module RuboCop
 
         def on_module(node)
           _module_name, *members = *node
-          members.each { |m| check_indentation(node.loc.keyword, m) }
+          check_members(node, members)
         end
 
         def on_class(node)
           _class_name, _base_class, *members = *node
-          members.each { |m| check_indentation(node.loc.keyword, m) }
+          check_members(node, members)
+        end
+
+        def check_members(node, members)
+          check_indentation(node.loc.keyword, members.first)
+
+          return unless members.any? && members.first.begin_type?
+          style =
+            config.for_cop('Style/IndentationConsistency')['EnforcedStyle']
+          return unless style == 'rails'
+
+          special = %w(protected private) # Extra indentation step after these.
+          previous_modifier = nil
+          members.first.children.each do |m|
+            if modifier_node?(m) && special.include?(m.source)
+              previous_modifier = m
+            elsif previous_modifier
+              check_indentation(previous_modifier.source_range, m, style)
+              previous_modifier = nil
+            end
+          end
         end
 
         def on_send(node)
           super
-          receiver, method_name, *args = *node
-          return unless visibility_and_def_on_same_line?(receiver, method_name,
-                                                         args)
+          return unless modifier_and_def_on_same_line?(node)
+          _, _, *args = *node
 
-          _method_name, _args, body = *args.first
-          check_indentation(node.loc.expression, body)
+          *_, body = *args.first
+
+          def_end_config = config.for_cop('Lint/DefEndAlignment')
+          style = if def_end_config['Enabled']
+                    def_end_config['AlignWith']
+                  else
+                    'start_of_line'
+                  end
+          base = style == 'def' ? args.first : node
+
+          check_indentation(base.source_range, body)
           ignore_node(args.first)
         end
 
@@ -80,21 +110,23 @@ module RuboCop
         end
 
         def on_while(node, base = node)
+          return if ignored_node?(node)
+
           _condition, body = *node
           return unless node.loc.keyword.begin_pos ==
-                        node.loc.expression.begin_pos
+                        node.source_range.begin_pos
 
           check_indentation(base.loc, body)
         end
 
-        alias_method :on_until, :on_while
+        alias on_until on_while
 
         def on_case(node)
           _condition, *branches = *node
           latest_when = nil
           branches.compact.each do |b|
             if b.type == :when
-              # TODO: Revert to the original expresson once the fix in Rubinius
+              # TODO: Revert to the original expression once the fix in Rubinius
               #   is released.
               #
               # Originally this expression was:
@@ -127,11 +159,7 @@ module RuboCop
           return if ternary_op?(node)
           return if modifier_if?(node)
 
-          case node.loc.keyword.source
-          when 'if'     then _condition, body, else_clause = *node
-          when 'unless' then _condition, else_clause, body = *node
-          else               _condition, body = *node
-          end
+          _condition, body, else_clause = if_node_parts(node)
 
           check_if(node, body, else_clause, base.loc) if body
         end
@@ -147,7 +175,7 @@ module RuboCop
 
           end_config = config.for_cop('Lint/EndAlignment')
           style = end_config['Enabled'] ? end_config['AlignWith'] : 'keyword'
-          base = style == 'variable' ? node : rhs
+          base = variable_alignment?(node.loc, rhs, style.to_sym) ? node : rhs
 
           case rhs.type
           when :if            then on_if(rhs, base)
@@ -164,15 +192,14 @@ module RuboCop
           check_indentation(base_loc, body)
           return unless else_clause
 
-          if elsif?(else_clause)
-            _condition, inner_body, inner_else_clause = *else_clause
-            check_if(else_clause, inner_body, inner_else_clause, base_loc)
-          else
-            check_indentation(node.loc.else, else_clause)
-          end
+          # If the else clause is an elsif, it will get its own on_if call so
+          # we don't need to process it here.
+          return if elsif?(else_clause)
+
+          check_indentation(node.loc.else, else_clause)
         end
 
-        def check_indentation(base_loc, body_node)
+        def check_indentation(base_loc, body_node, style = 'normal')
           return unless indentation_to_check?(base_loc, body_node)
 
           indentation = body_node.loc.column - base_loc.column
@@ -186,14 +213,34 @@ module RuboCop
             body_node = body_node.children.first
           end
 
-          expr = body_node.loc.expression
-          begin_pos, ind = expr.begin_pos, expr.begin_pos - indentation
-          pos = indentation >= 0 ? ind..begin_pos : begin_pos..ind
+          # Since autocorrect changes a number of lines, and not only the line
+          # where the reported offending range is, we avoid auto-correction if
+          # this cop has already found other offenses is the same
+          # range. Otherwise, two corrections can interfere with each other,
+          # resulting in corrupted code.
+          node = if autocorrect? && other_offense_in_same_range?(body_node)
+                   nil
+                 else
+                   body_node
+                 end
 
-          r = Parser::Source::Range.new(expr.source_buffer, pos.begin, pos.end)
-          add_offense(body_node, r,
+          indentation_name = style == 'normal' ? '' : "#{style} "
+          add_offense(node, offending_range(body_node, indentation),
                       format("Use #{configured_indentation_width} (not %d) " \
-                             'spaces for indentation.', indentation))
+                             "spaces for #{indentation_name}indentation.",
+                             indentation))
+        end
+
+        # Returns true if the given node is within another node that has
+        # already been marked for auto-correction by this cop.
+        def other_offense_in_same_range?(node)
+          expr = node.source_range
+          @offense_ranges ||= []
+
+          return true if @offense_ranges.any? { |r| within?(expr, r) }
+
+          @offense_ranges << expr
+          false
         end
 
         def indentation_to_check?(base_loc, body_node)
@@ -206,10 +253,23 @@ module RuboCop
 
           # Don't check indentation if the line doesn't start with the body.
           # For example, lines like "else do_something".
-          first_char_pos_on_line = body_node.loc.expression.source_line =~ /\S/
+          first_char_pos_on_line = body_node.source_range.source_line =~ /\S/
           return false unless body_node.loc.column == first_char_pos_on_line
 
+          if [:rescue, :ensure].include?(body_node.type)
+            block_body, = *body_node
+            return unless block_body
+          end
+
           true
+        end
+
+        def offending_range(body_node, indentation)
+          expr = body_node.source_range
+          begin_pos = expr.begin_pos
+          ind = expr.begin_pos - indentation
+          pos = indentation >= 0 ? ind..begin_pos : begin_pos..ind
+          Parser::Source::Range.new(expr.source_buffer, pos.begin, pos.end)
         end
 
         def starts_with_access_modifier?(body_node)

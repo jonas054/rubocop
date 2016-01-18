@@ -1,10 +1,13 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
 describe RuboCop::Cop::Lint::Syntax do
   describe '.offense_from_diagnostic' do
-    subject(:offense) { described_class.offense_from_diagnostic(diagnostic) }
+    subject(:offense) do
+      described_class.offense_from_diagnostic(diagnostic, 2.0)
+    end
     let(:diagnostic) { Parser::Diagnostic.new(level, reason, args, location) }
     let(:level) { :warning }
     let(:reason) { :odd_hash }
@@ -20,7 +23,10 @@ describe RuboCop::Cop::Lint::Syntax do
     end
 
     it "sets diagnostic's message to offense's message" do
-      expect(offense.message).to eq('odd number of entries for a hash')
+      expect(offense.message).to eq(
+        ['odd number of entries for a hash',
+         '(Using Ruby 2.0 parser; configure using `TargetRubyVersion` ' \
+         'parameter, under `AllCops`)'].join("\n"))
     end
 
     it "sets diagnostic's location to offense's location" do

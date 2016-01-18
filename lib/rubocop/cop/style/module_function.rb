@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,13 +8,13 @@ module RuboCop
       #
       # @example
       #
-      # module Test
-      #   extend self
+      #   module Test
+      #     extend self
       #
-      #   ...
+      #     ...
       # end
       class ModuleFunction < Cop
-        MSG = 'Use `module_function` instead of `extend self`.'
+        MSG = 'Use `module_function` instead of `extend self`.'.freeze
 
         TARGET_NODE = s(:send, nil, :extend, s(:self))
 

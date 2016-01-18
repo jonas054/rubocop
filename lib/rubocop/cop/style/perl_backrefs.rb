@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,18 +7,23 @@ module RuboCop
       # This cop looks for uses of Perl-style regexp match
       # backreferences like $1, $2, etc.
       class PerlBackrefs < Cop
-        MSG = 'Avoid the use of Perl-style backrefs.'
+        MSG = 'Avoid the use of Perl-style backrefs.'.freeze
 
         def on_nth_ref(node)
           add_offense(node, :expression)
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             backref, = *node
-
-            corrector.replace(node.loc.expression,
-                              "Regexp.last_match[#{backref}]")
+            parent_type = node.parent ? node.parent.type : nil
+            if [:dstr, :xstr, :regexp].include?(parent_type)
+              corrector.replace(node.source_range,
+                                "{Regexp.last_match(#{backref})}")
+            else
+              corrector.replace(node.source_range,
+                                "Regexp.last_match(#{backref})")
+            end
           end
         end
       end

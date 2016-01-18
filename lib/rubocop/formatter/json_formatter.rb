@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'json'
 require 'pathname'
@@ -11,7 +12,7 @@ module RuboCop
 
       attr_reader :output_hash
 
-      def initialize(output)
+      def initialize(output, options = {})
         super
         @output_hash = {
           metadata: metadata_hash,

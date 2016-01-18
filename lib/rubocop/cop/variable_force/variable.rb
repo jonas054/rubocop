@@ -1,9 +1,10 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     class VariableForce
-      # A Variable represents existance of a local variable.
+      # A Variable represents existence of a local variable.
       # This holds a variable declaration node,
       # and some states of the variable.
       class Variable
@@ -12,7 +13,7 @@ module RuboCop
 
         attr_reader :name, :declaration_node, :scope,
                     :assignments, :references, :captured_by_block
-        alias_method :captured_by_block?, :captured_by_block
+        alias captured_by_block? captured_by_block
 
         def initialize(name, declaration_node, scope)
           unless VARIABLE_DECLARATION_TYPES.include?(declaration_node.type)

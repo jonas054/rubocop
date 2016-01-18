@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,7 +9,7 @@ module RuboCop
       # This is a mimic of the warning
       # "shadowing outer local variable - foo" from `ruby -cw`.
       class ShadowingOuterLocalVariable < Cop
-        MSG = 'Shadowing outer local variable - `%s`.'
+        MSG = 'Shadowing outer local variable - `%s`.'.freeze
 
         def join_force?(force_class)
           force_class == VariableForce

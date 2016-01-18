@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,14 +8,10 @@ module RuboCop
       class Not < Cop
         include AutocorrectUnlessChangingAST
 
-        MSG = 'Use `!` instead of `not`.'
+        MSG = 'Use `!` instead of `not`.'.freeze
 
         def on_send(node)
-          _receiver, method_name, *args = *node
-
-          # not does not take any arguments
-          return unless args.empty? && method_name == :! &&
-                        node.loc.selector.is?('not')
+          return unless node.keyword_not?
 
           add_offense(node, :selector)
         end
@@ -22,11 +19,8 @@ module RuboCop
         private
 
         def correction(node)
-          lambda do |corrector|
-            old_source = node.loc.expression.source
-            new_source = old_source.sub(/not\s+/, '!')
-            corrector.replace(node.loc.expression, new_source)
-          end
+          new_source = node.source.sub(/not\s+/, '!')
+          ->(corrector) { corrector.replace(node.source_range, new_source) }
         end
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -11,12 +12,12 @@ describe 'RuboCop Project' do
     end
 
     it 'has configuration for all cops' do
-      expect(default_config.keys.sort).to eq((['AllCops'] + cop_names).sort)
+      expect(default_config.keys).to match_array(%w(AllCops Rails) + cop_names)
     end
 
     it 'has a nicely formatted description for all cops' do
       cop_names.each do |name|
-        description = default_config[name]['Description']
+        description = default_config.fetch(name).fetch('Description')
         expect(description).not_to be_nil
         expect(description).not_to include("\n")
       end
@@ -96,6 +97,7 @@ describe 'RuboCop Project' do
         let(:bodies) do
           entries.map do |entry|
             entry
+              .gsub(/`[^`]+`/, '``')
               .sub(/^\*\s*(?:\[.+?\):\s*)?/, '')
               .sub(/\s*\([^\)]+\)$/, '')
           end

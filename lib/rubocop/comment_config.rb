@@ -1,9 +1,11 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # This class parses the special `rubocop:disable` comments in a source
   # and provides a way to check if each cop is enabled at arbitrary line.
   class CommentConfig
+    UNNEEDED_DISABLE = 'Lint/UnneededDisable'.freeze
     COMMENT_DIRECTIVE_REGEXP = Regexp.new(
       '\A# rubocop : ((?:dis|en)able)\b ((?:[\w/]+,? )+)'.gsub(' ', '\s*')
     )
@@ -34,6 +36,12 @@ module RuboCop
         if single_line
           disabled_line_ranges[cop_name] << (line..line) if disabled
         elsif disabled
+          if disablement_start_line_numbers[cop_name]
+            # Cop already disabled on this line, so we end the current disabled
+            # range before we start a new range.
+            start_line = disablement_start_line_numbers.delete(cop_name)
+            disabled_line_ranges[cop_name] << (start_line..line)
+          end
           disablement_start_line_numbers[cop_name] = line
         else
           start_line = disablement_start_line_numbers.delete(cop_name)
@@ -65,7 +73,7 @@ module RuboCop
         single_line = !comment_only_line?(comment_line_number)
 
         cop_names.each do |cop_name|
-          cop_name = Cop::Cop.qualified_cop_name(cop_name,
+          cop_name = Cop::Cop.qualified_cop_name(cop_name.strip,
                                                  processed_source.buffer.name)
           yield cop_name, disabled, comment_line_number, single_line
         end
@@ -73,7 +81,9 @@ module RuboCop
     end
 
     def all_cop_names
-      @all_cop_names ||= Cop::Cop.all.map(&:cop_name)
+      @all_cop_names ||= Cop::Cop.all.map(&:cop_name).reject do |cop_name|
+        cop_name == UNNEEDED_DISABLE
+      end
     end
 
     def comment_only_line?(line_number)

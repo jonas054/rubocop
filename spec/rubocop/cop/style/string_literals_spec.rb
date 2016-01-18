@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -8,8 +9,7 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
   context 'configured with single quotes preferred' do
     let(:cop_config) { { 'EnforcedStyle' => 'single_quotes' } }
 
-    it 'registers offense for double quotes when single quotes ' \
-       'suffice' do
+    it 'registers offense for double quotes when single quotes suffice' do
       inspect_source(cop, ['s = "abc"',
                            'x = "a\\\\b"',
                            'y ="\\\\b"',
@@ -35,17 +35,22 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
     end
 
     it 'accepts single quotes' do
-      inspect_source(cop, ["a = 'x'"])
+      inspect_source(cop, "a = 'x'")
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'accepts single quotes in interpolation' do
+      inspect_source(cop, %q("hello#{hash['there']}"))
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts %q and %Q quotes' do
-      inspect_source(cop, ['a = %q(x) + %Q[x]'])
+      inspect_source(cop, 'a = %q(x) + %Q[x]')
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts % quotes' do
-      inspect_source(cop, ['a = %(x)'])
+      inspect_source(cop, 'a = %(x)')
       expect(cop.offenses).to be_empty
     end
 
@@ -72,7 +77,7 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
     end
 
     it 'accepts double quotes at the start of regexp literals' do
-      inspect_source(cop, ['s = /"((?:[^\\"]|\\.)*)"/'])
+      inspect_source(cop, 's = /"((?:[^\\"]|\\.)*)"/')
       expect(cop.offenses).to be_empty
     end
 
@@ -86,17 +91,17 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
     end
 
     it 'accepts " in a %w' do
-      inspect_source(cop, ['%w(")'])
+      inspect_source(cop, '%w(")')
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts \\\\\n in a string' do # this would be: "\\\n"
-      inspect_source(cop, ['"foo \\\\\n bar"'])
+      inspect_source(cop, '"foo \\\\\n bar"')
       expect(cop.offenses).to be_empty
     end
 
-    it 'accepts double quotes within embedded expression' do
-      src = ['"#{"A"}"']
+    it 'accepts double quotes in interpolation' do
+      src = '"#{"A"}"'
       inspect_source(cop, src)
       expect(cop.offenses).to be_empty
     end
@@ -125,6 +130,24 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
       new_source = autocorrect_source(cop, 's = "abc"')
       expect(new_source).to eq("s = 'abc'")
     end
+
+    it 'registers an offense for "\""' do
+      inspect_source(cop, '"\\""')
+      expect(cop.offenses.size).to eq(1)
+      expect(cop.messages).to eq(['Prefer single-quoted strings when you ' \
+                                  "don't need string interpolation or " \
+                                  'special symbols.'])
+    end
+
+    it 'registers an offense for hello... using hex escapes' do
+      inspect_source(cop, '"\\x68\\x65\\x6c\\x6c\\x6f"')
+      expect(cop.offenses.size).to eq(1)
+    end
+
+    it 'autocorrects hello... using hex escapes' do
+      new_source = autocorrect_source(cop, '"\\x68\\x65\\x6c\\x6c\\x6f"')
+      expect(new_source).to eq("'hello'")
+    end
   end
 
   context 'configured with double quotes preferred' do
@@ -132,7 +155,7 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
 
     it 'registers offense for single quotes when double quotes would ' \
       'be equivalent' do
-      inspect_source(cop, ["s = 'abc'"])
+      inspect_source(cop, "s = 'abc'")
       expect(cop.highlights).to eq(["'abc'"])
       expect(cop.messages)
         .to eq(['Prefer double-quoted strings unless you need ' \
@@ -153,17 +176,22 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
     end
 
     it 'accepts double quotes' do
-      inspect_source(cop, ['a = "x"'])
+      inspect_source(cop, 'a = "x"')
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'accepts single quotes in interpolation' do
+      inspect_source(cop, %q("hello#{hash['there']}"))
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts %q and %Q quotes' do
-      inspect_source(cop, ['a = %q(x) + %Q[x]'])
+      inspect_source(cop, 'a = %q(x) + %Q[x]')
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts % quotes' do
-      inspect_source(cop, ['a = %(x)'])
+      inspect_source(cop, 'a = %(x)')
       expect(cop.offenses).to be_empty
     end
 
@@ -178,18 +206,19 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
 
     it 'accepts single quotes when they are needed' do
       src = ["a = '\\n'",
-             "b = '\"'"]
+             "b = '\"'",
+             "c = '\#{x}'"]
       inspect_source(cop, src)
       expect(cop.offenses).to be_empty
     end
 
     it 'accepts single quotes at the start of regexp literals' do
-      inspect_source(cop, ["s = /'((?:[^\\']|\\.)*)'/"])
+      inspect_source(cop, "s = /'((?:[^\\']|\\.)*)'/")
       expect(cop.offenses).to be_empty
     end
 
     it "accepts ' in a %w" do
-      inspect_source(cop, ["%w(')"])
+      inspect_source(cop, "%w(')")
       expect(cop.offenses).to be_empty
     end
 
@@ -211,8 +240,94 @@ describe RuboCop::Cop::Style::StringLiterals, :config do
     let(:cop_config) { { 'EnforcedStyle' => 'other' } }
 
     it 'fails' do
-      expect { inspect_source(cop, ['a = "b"']) }
+      expect { inspect_source(cop, 'a = "b"') }
         .to raise_error(RuntimeError)
+    end
+  end
+
+  context 'when ConsistentQuotesInMultiline is true' do
+    context 'and EnforcedStyle is single_quotes' do
+      let(:cop_config) do
+        {
+          'ConsistentQuotesInMultiline' => true,
+          'EnforcedStyle' => 'single_quotes'
+        }
+      end
+
+      it 'accepts continued strings using all single quotes' do
+        inspect_source(cop, ["'abc' \\",
+                             "'def'"])
+        expect(cop.offenses).to be_empty
+      end
+
+      it 'registers an offense for mixed quote styles in a continued string' do
+        inspect_source(cop, ["'abc' \\",
+                             '"def"'])
+        expect(cop.offenses.size).to eq(1)
+        expect(cop.messages).to eq(['Inconsistent quote style.'])
+        expect(cop.highlights).to eq(["'abc' \\\n\"def\""])
+      end
+
+      it 'registers an offense for unneeded double quotes in continuation' do
+        inspect_source(cop, ['"abc" \\',
+                             '"def"'])
+        expect(cop.offenses.size).to eq(1)
+        expect(cop.messages).to eq(['Prefer single-quoted strings when you ' \
+                                    "don't need string interpolation or " \
+                                    'special symbols.'])
+        expect(cop.highlights).to eq(["\"abc\" \\\n\"def\""])
+      end
+
+      it "doesn't register offense for double quotes with interpolation" do
+        inspect_source(cop, ['"abc" \\',
+                             '"def#{1}"'])
+        expect(cop.offenses).to be_empty
+      end
+
+      it "doesn't register offense for double quotes with embedded single" do
+        inspect_source(cop, ['"abc\'" \\',
+                             '"def"'])
+        expect(cop.offenses).to be_empty
+      end
+    end
+
+    context 'and EnforcedStyle is double_quotes' do
+      let(:cop_config) do
+        {
+          'ConsistentQuotesInMultiline' => true,
+          'EnforcedStyle' => 'double_quotes'
+        }
+      end
+
+      it 'accepts continued strings using all double quotes' do
+        inspect_source(cop, ['"abc" \\',
+                             '"def"'])
+        expect(cop.offenses).to be_empty
+      end
+
+      it 'registers an offense for mixed quote styles in a continued string' do
+        inspect_source(cop, ["'abc' \\",
+                             '"def"'])
+        expect(cop.offenses.size).to eq(1)
+        expect(cop.messages).to eq(['Inconsistent quote style.'])
+        expect(cop.highlights).to eq(["'abc' \\\n\"def\""])
+      end
+
+      it 'registers an offense for unneeded single quotes in continuation' do
+        inspect_source(cop, ["'abc' \\",
+                             "'def'"])
+        expect(cop.offenses.size).to eq(1)
+        expect(cop.messages).to eq(['Prefer double-quoted strings unless you ' \
+                                    'need single quotes to avoid extra ' \
+                                    'backslashes for escaping.'])
+        expect(cop.highlights).to eq(["'abc' \\\n'def'"])
+      end
+
+      it "doesn't register offense for single quotes with embedded double" do
+        inspect_source(cop, ["'abc\"' \\",
+                             "'def'"])
+        expect(cop.offenses).to be_empty
+      end
     end
   end
 end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
       # This cop checks for nested ternary op expressions.
       class NestedTernaryOperator < Cop
         MSG = 'Ternary operators must not be nested. Prefer `if`/`else` ' \
-              'constructs instead.'
+              'constructs instead.'.freeze
 
         def on_if(node)
           loc = node.loc

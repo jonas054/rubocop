@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -11,7 +12,7 @@ module RuboCop
         REFERENCE_PENETRABLE_BRANCH_TYPES = %w(rescue_main ensure_main).freeze
 
         attr_reader :node, :variable, :referenced
-        alias_method :referenced?, :referenced
+        alias referenced? referenced
 
         def initialize(node, variable)
           unless VARIABLE_ASSIGNMENT_TYPES.include?(node.type)

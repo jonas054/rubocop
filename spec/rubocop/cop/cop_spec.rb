@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -74,6 +75,60 @@ describe RuboCop::Cop::Cop do
     expect(cop.offenses.first.cop_name).to eq('Style/For')
   end
 
+  describe 'setting of Offense#corrected attribute' do
+    context 'when cop does not support autocorrection' do
+      before do
+        allow(cop).to receive(:support_autocorrect?).and_return(false)
+      end
+
+      it 'is not specified (set to nil)' do
+        cop.add_offense(nil, location, 'message')
+        expect(cop.offenses.first.corrected?).to be_nil
+      end
+    end
+
+    context 'when cop supports autocorrection' do
+      before do
+        @cop = RuboCop::Cop::Style::Alias.new
+      end
+
+      context 'when offense was corrected' do
+        before do
+          allow(@cop).to receive(:autocorrect?).and_return(true)
+          allow(@cop).to receive(:autocorrect).and_return(->(corrector) {})
+        end
+
+        it 'is set to true' do
+          @cop.add_offense(nil, location, 'message')
+          expect(@cop.offenses.first.corrected?).to eq(true)
+        end
+      end
+
+      context 'when autocorrection is not needed' do
+        before do
+          allow(@cop).to receive(:autocorrect?).and_return(false)
+        end
+
+        it 'is set to false' do
+          @cop.add_offense(nil, location, 'message')
+          expect(@cop.offenses.first.corrected?).to eq(false)
+        end
+      end
+
+      context 'when offense was not corrected because of an error' do
+        before do
+          allow(@cop).to receive(:autocorrect?).and_return(true)
+          allow(@cop).to receive(:autocorrect).and_return(false)
+        end
+
+        it 'is set to false' do
+          @cop.add_offense(nil, location, 'message')
+          expect(@cop.offenses.first.corrected?).to eq(false)
+        end
+      end
+    end
+  end
+
   context 'with no submodule' do
     subject(:cop) { described_class }
     it('has right name') { expect(cop.cop_name).to eq('Cop/Cop') }
@@ -102,11 +157,9 @@ describe RuboCop::Cop::Cop do
     context '#types' do
       subject { described_class.all.types }
       it('has types') { expect(subject.length).not_to eq(0) }
-      it { should include :lint }
-      it do
-        should include :rails
-      end
-      it { should include :style }
+      it { is_expected.to include(:lint) }
+      it { is_expected.to include(:rails) }
+      it { is_expected.to include(:style) }
       it 'contains every value only once' do
         expect(subject.length).to eq(subject.uniq.length)
       end
@@ -129,6 +182,41 @@ describe RuboCop::Cop::Cop do
 
       it 'returns 0 for an invalid type' do
         expect(described_class.all.with_type('x').length).to be 0
+      end
+    end
+  end
+
+  describe '#autocorrect?' do
+    # dummy config for a generic cop instance
+    let(:config) { RuboCop::Config.new({}) }
+    let(:options) { nil }
+    let(:cop) { described_class.new(config, options) }
+    let(:support_autocorrect) { true }
+    subject { cop.autocorrect? }
+
+    before do
+      allow(cop).to receive(:support_autocorrect?) { support_autocorrect }
+    end
+
+    context 'when the option is not given' do
+      let(:options) { {} }
+      it { is_expected.to be(false) }
+    end
+
+    context 'when the option is given' do
+      let(:options) { { auto_correct: true } }
+      it { is_expected.to be(true) }
+
+      context 'when cop does not support autocorrection' do
+        let(:support_autocorrect) { false }
+        it { is_expected.to be(false) }
+      end
+
+      context 'when the cop is set to not autocorrect' do
+        let(:config) do
+          RuboCop::Config.new('Cop/Cop' => { 'AutoCorrect' => false })
+        end
+        it { is_expected.to be(false) }
       end
     end
   end

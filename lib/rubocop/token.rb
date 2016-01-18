@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # A basic wrapper around Parser's tokens.
@@ -12,7 +13,10 @@ module RuboCop
     end
 
     def initialize(pos, type, text)
-      @pos, @type, @text = pos, type, text
+      @pos = pos
+      @type = type
+      # Parser token "text" may be a Fixnum
+      @text = text.to_s
     end
 
     def to_s

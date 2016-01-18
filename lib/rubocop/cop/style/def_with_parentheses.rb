@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
         include OnMethodDef
 
         MSG = "Omit the parentheses in defs when the method doesn't accept " \
-              'any arguments.'
+              'any arguments.'.freeze
 
         def on_method_def(node, _method_name, args, _body)
           start_line = node.loc.keyword.line
@@ -22,7 +23,7 @@ module RuboCop
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             corrector.remove(node.loc.begin)
             corrector.remove(node.loc.end)
           end

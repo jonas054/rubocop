@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -42,6 +43,14 @@ describe RuboCop::Cop::Rails::Delegate do
     expect(cop.messages)
       .to eq(['Use `delegate` to define delegations.'])
     expect(cop.highlights).to eq(['def'])
+  end
+
+  it 'ignores class methods' do
+    inspect_source(cop,
+                   ['def self.fox',
+                    '  new.fox',
+                    'end'])
+    expect(cop.offenses).to be_empty
   end
 
   it 'ignores non trivial delegate' do

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -12,7 +13,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                       '  end'
                      ])
       expect(cop.messages)
-        .to eq(['`end` at 2, 2 is not aligned with `test do` at 1, 0'])
+        .to eq(['`end` at 2, 2 is not aligned with `test do` at 1, 0.'])
     end
 
     it 'auto-corrects alignment' do
@@ -32,7 +33,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                       '  end'
                      ])
       expect(cop.messages)
-        .to eq(['`end` at 2, 2 is not aligned with `test do |ala|` at 1, 0'])
+        .to eq(['`end` at 2, 2 is not aligned with `test do |ala|` at 1, 0.'])
     end
 
     it 'auto-corrects alignment' do
@@ -45,7 +46,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
     end
   end
 
-  it 'acepts a block end that does not begin its line' do
+  it 'accepts a block end that does not begin its line' do
     inspect_source(cop,
                    ['  scope :bar, lambda { joins(:baz)',
                     '                       .distinct }'
@@ -82,7 +83,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                      ])
       expect(cop.messages)
         .to eq(['`end` at 2, 4 is not aligned with' \
-                ' `a = b = c = test do |ala|` at 1, 0'])
+                ' `a = b = c = test do |ala|` at 1, 0.'])
     end
 
     it 'accepts end aligned with the first variable' do
@@ -93,14 +94,14 @@ describe RuboCop::Cop::Lint::BlockAlignment do
       expect(cop.offenses).to be_empty
     end
 
-    it 'auto-corrects alignment to the block start' do
+    it 'auto-corrects alignment to the first variable' do
       new_source = autocorrect_source(cop,
                                       ['a = b = c = test do |ala|',
                                        '    end'
                                       ])
 
       expect(new_source).to eq(['a = b = c = test do |ala|',
-                                '            end'
+                                'end'
                                ].join("\n"))
     end
   end
@@ -123,7 +124,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `variable = test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   context 'when the block is defined on the next line' do
@@ -146,7 +147,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                      ])
       expect(cop.messages)
         .to eq(['`end` at 4, 0 is not aligned with' \
-                ' `a_long_method_that_dont_fit_on_the_line do |v|` at 2, 2'])
+                ' `a_long_method_that_dont_fit_on_the_line do |v|` at 2, 2.'])
     end
 
     it 'auto-corrects alignment' do
@@ -202,11 +203,11 @@ describe RuboCop::Cop::Lint::BlockAlignment do
       inspect_source(cop, src)
       expect(cop.messages)
         .to eq(['`end` at 5, 8 is not aligned with `bar.get_stuffs` at 2, 2' \
-                ' or `.reject do |stuff|` at 3, 6',
+                ' or `.reject do |stuff|` at 3, 6.',
                 '`end` at 7, 4 is not aligned with `bar.get_stuffs` at 2, 2' \
-                ' or `end.select do |stuff|` at 5, 8',
+                ' or `end.select do |stuff|` at 5, 8.',
                 '`end` at 10, 8 is not aligned with `bar.get_stuffs` at 2, 2' \
-                ' or `.select do |stuff|` at 8, 6'])
+                ' or `.select do |stuff|` at 8, 6.'])
     end
 
     # Example from issue 393 of bbatsov/rubocop on github:
@@ -294,17 +295,20 @@ describe RuboCop::Cop::Lint::BlockAlignment do
       inspect_source(cop, src)
       expect(cop.messages)
         .to eq(['`end` at 4, 4 is not aligned with `e,` at 1, 0 or' \
-                ' `f = [5, 6].map do |i|` at 2, 0'])
+                ' `f = [5, 6].map do |i|` at 2, 0.'])
     end
 
-    it 'can not auto-correct' do
+    it 'auto-corrects' do
       src = ['e,',
              'f = [5, 6].map do |i|',
              '  i - 5',
              '    end']
-
+      corrected = ['e,',
+                   'f = [5, 6].map do |i|',
+                   '  i - 5',
+                   'end']
       new_source = autocorrect_source(cop, src)
-      expect(new_source).to eq(src.join("\n"))
+      expect(new_source).to eq(corrected.join("\n"))
     end
   end
 
@@ -324,7 +328,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `@variable = test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   it 'accepts end aligned with a class variable' do
@@ -342,7 +346,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `@@variable = test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   it 'accepts end aligned with a global variable' do
@@ -360,7 +364,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `$variable = test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   it 'accepts end aligned with a constant' do
@@ -378,12 +382,12 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with' \
-              ' `Module::CONSTANT = test do |ala|` at 1, 0'])
+              ' `Module::CONSTANT = test do |ala|` at 1, 0.'])
   end
 
   it 'accepts end aligned with a method call' do
     inspect_source(cop,
-                   ['parser.childs << lambda do |token|',
+                   ['parser.children << lambda do |token|',
                     '  token << 1',
                     'end'
                    ])
@@ -392,13 +396,13 @@ describe RuboCop::Cop::Lint::BlockAlignment do
 
   it 'registers an offense for mismatched block end with a method call' do
     inspect_source(cop,
-                   ['parser.childs << lambda do |token|',
+                   ['parser.children << lambda do |token|',
                     '  token << 1',
                     '  end'
                    ])
     expect(cop.messages)
       .to eq(['`end` at 3, 2 is not aligned with' \
-              ' `parser.childs << lambda do |token|` at 1, 0'])
+              ' `parser.children << lambda do |token|` at 1, 0.'])
   end
 
   it 'accepts end aligned with a method call with arguments' do
@@ -419,13 +423,12 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 3, 2 is not aligned with' \
-              ' `@h[:f] = f.each_pair.map do |f, v|` at 1, 0'])
+              ' `@h[:f] = f.each_pair.map do |f, v|` at 1, 0.'])
   end
 
   it 'does not raise an error for nested block in a method call' do
     inspect_source(cop,
-                   ['expect(arr.all? { |o| o.valid? })'
-                   ])
+                   'expect(arr.all? { |o| o.valid? })')
     expect(cop.offenses).to be_empty
   end
 
@@ -447,7 +450,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 3, 2 is not aligned with `arr.all? do |o|` at 1, 7 or' \
-              ' `expect(arr.all? do |o|` at 1, 0'])
+              ' `expect(arr.all? do |o|` at 1, 0.'])
   end
 
   it 'accepts end aligned with an op-asgn (+=, -=)' do
@@ -466,7 +469,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                     '  end'
                    ])
     expect(cop.messages)
-      .to eq(['`end` at 3, 2 is not aligned with `rb` at 1, 0'])
+      .to eq(['`end` at 3, 2 is not aligned with `rb` at 1, 0.'])
   end
 
   it 'accepts end aligned with an and-asgn (&&=)' do
@@ -484,7 +487,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `variable &&= test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   it 'accepts end aligned with an or-asgn (||=)' do
@@ -502,7 +505,7 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                    ])
     expect(cop.messages)
       .to eq(['`end` at 2, 2 is not aligned with `variable ||= test do |ala|`' \
-              ' at 1, 0'])
+              ' at 1, 0.'])
   end
 
   it 'accepts end aligned with a mass assignment' do
@@ -529,6 +532,141 @@ describe RuboCop::Cop::Lint::BlockAlignment do
                     '  end'
                    ])
     expect(cop.messages)
-      .to eq(['`end` at 3, 2 is not aligned with `var1, var2` at 1, 0'])
+      .to eq(['`end` at 3, 2 is not aligned with `var1, var2` at 1, 0.'])
+  end
+
+  context 'when multiple similar-looking blocks have misaligned ends' do
+    it 'registers an offense for each of them' do
+      inspect_source(cop,
+                     ['a = test do',
+                      ' end',
+                      'b = test do',
+                      ' end'
+                     ])
+      expect(cop.offenses.size).to eq 2
+    end
+  end
+
+  context 'on a splatted method call' do
+    it 'aligns end with the splat operator' do
+      inspect_source(cop,
+                     ['def get_gems_by_name',
+                      '  @gems ||= Hash[*get_latest_gems.map { |gem|',
+                      '                   [gem.name, gem, gem.full_name, gem]',
+                      '                 }.flatten]',
+                      'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'autocorrects' do
+      source = ['def get_gems_by_name',
+                '  @gems ||= Hash[*get_latest_gems.map { |gem|',
+                '                   [gem.name, gem, gem.full_name, gem]',
+                '              }.flatten]',
+                'end']
+      corrected = ['def get_gems_by_name',
+                   '  @gems ||= Hash[*get_latest_gems.map { |gem|',
+                   '                   [gem.name, gem, gem.full_name, gem]',
+                   '                 }.flatten]',
+                   'end']
+
+      new_source = autocorrect_source(cop, source)
+      expect(new_source).to eq(corrected.join("\n"))
+    end
+  end
+
+  context 'on a bit-flipped method call' do
+    it 'aligns end with the ~ operator' do
+      inspect_source(cop,
+                     ['def abc',
+                      '  @abc ||= A[~xyz { |x|',
+                      '               x',
+                      '             }.flatten]',
+                      'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'autocorrects' do
+      source = ['def abc',
+                '  @abc ||= A[~xyz { |x|',
+                '               x',
+                '                        }.flatten]',
+                'end']
+      corrected = ['def abc',
+                   '  @abc ||= A[~xyz { |x|',
+                   '               x',
+                   '             }.flatten]',
+                   'end']
+
+      new_source = autocorrect_source(cop, source)
+      expect(new_source).to eq(corrected.join("\n"))
+    end
+  end
+
+  context 'on a logically negated method call' do
+    it 'aligns end with the ! operator' do
+      inspect_source(cop,
+                     ['def abc',
+                      '  @abc ||= A[!xyz { |x|',
+                      '               x',
+                      '             }.flatten]',
+                      'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'autocorrects' do
+      source = ['def abc',
+                '  @abc ||= A[!xyz { |x|',
+                '               x',
+                '}.flatten]',
+                'end']
+      corrected = ['def abc',
+                   '  @abc ||= A[!xyz { |x|',
+                   '               x',
+                   '             }.flatten]',
+                   'end']
+
+      new_source = autocorrect_source(cop, source)
+      expect(new_source).to eq(corrected.join("\n"))
+    end
+  end
+
+  context 'on an arithmetically negated method call' do
+    it 'aligns end with the - operator' do
+      inspect_source(cop,
+                     ['def abc',
+                      '  @abc ||= A[-xyz { |x|',
+                      '               x',
+                      '             }.flatten]',
+                      'end'])
+      expect(cop.offenses).to be_empty
+    end
+
+    it 'autocorrects' do
+      source = ['def abc',
+                '  @abc ||= A[-xyz { |x|',
+                '               x',
+                '                  }.flatten]',
+                'end']
+      corrected = ['def abc',
+                   '  @abc ||= A[-xyz { |x|',
+                   '               x',
+                   '             }.flatten]',
+                   'end']
+
+      new_source = autocorrect_source(cop, source)
+      expect(new_source).to eq(corrected.join("\n"))
+    end
+  end
+
+  context 'when the block is terminated by }' do
+    it 'mentions } (not end) in the message' do
+      inspect_source(cop,
+                     ['test {',
+                      '  }'
+                     ])
+      expect(cop.messages)
+        .to eq(['`}` at 2, 2 is not aligned with `test {` at 1, 0.'])
+    end
   end
 end

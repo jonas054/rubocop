@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -33,6 +34,16 @@ describe RuboCop::Cop::Metrics::AbcSize, :config do
         .to eq(['Assignment Branch Condition size for method_name is too ' \
                 'high. [1/0]'])
       expect(cop.config_to_allow_offenses).to eq('Max' => 1)
+    end
+
+    it 'registers an offense for an assignment of an element' do
+      inspect_source(cop, ['def method_name',
+                           '  x[0] = 1',
+                           'end'])
+      expect(cop.messages)
+        .to eq(['Assignment Branch Condition size for method_name is too ' \
+                'high. [1.41/0]'])
+      expect(cop.config_to_allow_offenses).to eq('Max' => 2)
     end
 
     it 'registers an offense for complex content including A, B, and C ' \

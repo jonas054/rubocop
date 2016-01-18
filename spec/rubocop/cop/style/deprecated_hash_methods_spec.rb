@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -7,7 +8,7 @@ describe RuboCop::Cop::Style::DeprecatedHashMethods do
 
   it 'registers an offense for has_key? with one arg' do
     inspect_source(cop,
-                   ['o.has_key?(o)'])
+                   'o.has_key?(o)')
     expect(cop.offenses.size).to eq(1)
     expect(cop.messages)
       .to eq(['`Hash#has_key?` is deprecated in favor of `Hash#key?`.'])
@@ -15,13 +16,13 @@ describe RuboCop::Cop::Style::DeprecatedHashMethods do
 
   it 'accepts has_key? with no args' do
     inspect_source(cop,
-                   ['o.has_key?'])
+                   'o.has_key?')
     expect(cop.offenses).to be_empty
   end
 
   it 'registers an offense for has_value? with one arg' do
     inspect_source(cop,
-                   ['o.has_value?(o)'])
+                   'o.has_value?(o)')
     expect(cop.offenses.size).to eq(1)
     expect(cop.messages)
       .to eq(['`Hash#has_value?` is deprecated in favor of `Hash#value?`.'])
@@ -29,7 +30,7 @@ describe RuboCop::Cop::Style::DeprecatedHashMethods do
 
   it 'accepts has_value? with no args' do
     inspect_source(cop,
-                   ['o.has_value?'])
+                   'o.has_value?')
     expect(cop.offenses).to be_empty
   end
 

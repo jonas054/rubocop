@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -6,7 +7,7 @@ describe RuboCop::Cop::Style::BlockEndNewline do
   subject(:cop) { described_class.new }
 
   it 'does not register an offense for a one-liner' do
-    inspect_source(cop, ['test do foo end'])
+    inspect_source(cop, 'test do foo end')
     expect(cop.messages).to be_empty
   end
 
@@ -38,8 +39,8 @@ describe RuboCop::Cop::Style::BlockEndNewline do
   end
 
   it 'autocorrects a do/end block where the end is not on its own line' do
-    src =  ['test do',
-            '  foo end']
+    src = ['test do',
+           '  foo end']
 
     new_source = autocorrect_source(cop, src)
 
@@ -49,8 +50,8 @@ describe RuboCop::Cop::Style::BlockEndNewline do
   end
 
   it 'autocorrects a {} block where the } is not on its own line' do
-    src =  ['test {',
-            '  foo }']
+    src = ['test {',
+           '  foo }']
 
     new_source = autocorrect_source(cop, src)
 

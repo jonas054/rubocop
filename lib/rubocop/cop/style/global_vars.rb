@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -10,7 +11,7 @@ module RuboCop
       #
       # Note that backreferences like $1, $2, etc are not global variables.
       class GlobalVars < Cop
-        MSG = 'Do not introduce global variables.'
+        MSG = 'Do not introduce global variables.'.freeze
 
         # predefined global variables their English aliases
         # http://www.zenspider.com/Languages/Ruby/QuickRef.html
@@ -44,11 +45,7 @@ module RuboCop
         ).map(&:to_sym)
 
         def user_vars
-          if cop_config['AllowedVariables']
-            cop_config['AllowedVariables'].map(&:to_sym)
-          else
-            []
-          end
+          cop_config['AllowedVariables'].map(&:to_sym)
         end
 
         def allowed_var?(global_var)

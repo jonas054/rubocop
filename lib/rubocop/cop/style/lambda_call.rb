@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -37,13 +38,12 @@ module RuboCop
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             if style == :call
               receiver_node, = *node
-              expr = node.loc.expression
-              receiver = receiver_node.loc.expression.source
-              replacement = expr.source.sub("#{receiver}.", "#{receiver}.call")
-              corrector.replace(expr, replacement)
+              receiver = receiver_node.source
+              replacement = node.source.sub("#{receiver}.", "#{receiver}.call")
+              corrector.replace(node.source_range, replacement)
             else
               corrector.remove(node.loc.selector)
             end

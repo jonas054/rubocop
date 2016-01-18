@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -7,18 +8,19 @@ describe RuboCop::Cop::Team do
   let(:cop_classes) { RuboCop::Cop::Cop.non_rails }
   let(:config) { RuboCop::ConfigLoader.default_configuration }
   let(:options) { nil }
+  let(:ruby_version) { RuboCop::Config::KNOWN_RUBIES.last }
 
   describe '#autocorrect?' do
     subject { team.autocorrect? }
 
     context 'when the option argument of .new is omitted' do
       subject { described_class.new(cop_classes, config).autocorrect? }
-      it { should be_falsey }
+      it { is_expected.to be_falsey }
     end
 
     context 'when { auto_correct: true } is passed to .new' do
       let(:options) { { auto_correct: true } }
-      it { should be_truthy }
+      it { is_expected.to be_truthy }
     end
   end
 
@@ -27,12 +29,12 @@ describe RuboCop::Cop::Team do
 
     context 'when the option argument of .new is omitted' do
       subject { described_class.new(cop_classes, config).debug? }
-      it { should be_falsey }
+      it { is_expected.to be_falsey }
     end
 
     context 'when { debug: true } is passed to .new' do
       let(:options) { { debug: true } }
-      it { should be_truthy }
+      it { is_expected.to be_truthy }
     end
   end
 
@@ -41,14 +43,15 @@ describe RuboCop::Cop::Team do
 
     let(:file_path) { '/tmp/example.rb' }
     let(:offenses) do
-      team.inspect_file(RuboCop::ProcessedSource.from_file(file_path))
+      source = RuboCop::ProcessedSource.from_file(file_path, ruby_version)
+      team.inspect_file(source)
     end
 
     before do
       create_file(file_path, [
-        '#' * 90,
-        'puts test;'
-      ])
+                    '#' * 90,
+                    'puts test;'
+                  ])
     end
 
     it 'returns offenses' do
@@ -59,10 +62,10 @@ describe RuboCop::Cop::Team do
     context 'when Parser reports non-fatal warning for the file' do
       before do
         create_file(file_path, [
-          '# encoding: utf-8',
-          '#' * 90,
-          'puts *test'
-        ])
+                      '# encoding: utf-8',
+                      '#' * 90,
+                      'puts *test'
+                    ])
       end
 
       let(:cop_names) { offenses.map(&:cop_name) }
@@ -81,13 +84,14 @@ describe RuboCop::Cop::Team do
 
       before do
         create_file(file_path, [
-          '# encoding: utf-8',
-          'puts "string"'
-        ])
+                      '# encoding: utf-8',
+                      'puts "string"'
+                    ])
       end
 
       it 'does autocorrection' do
-        team.inspect_file(RuboCop::ProcessedSource.from_file(file_path))
+        source = RuboCop::ProcessedSource.from_file(file_path, ruby_version)
+        team.inspect_file(source)
         corrected_source = File.read(file_path)
         expect(corrected_source).to eq([
           '# encoding: utf-8',
@@ -115,7 +119,7 @@ describe RuboCop::Cop::Team do
         [RuboCop::Cop::Lint::Void, RuboCop::Cop::Metrics::LineLength]
       end
 
-      it 'returns only intances of the classes' do
+      it 'returns only instances of the classes' do
         expect(cops.size).to eq(2)
         cops.sort! { |a, b| a.name <=> b.name }
         expect(cops[0].name).to eq('Lint/Void')
@@ -137,7 +141,7 @@ describe RuboCop::Cop::Team do
       end
       let(:cop_names) { cops.map(&:name) }
 
-      it 'does not return intances of the classes' do
+      it 'does not return instances of the classes' do
         expect(cops).not_to be_empty
         expect(cop_names).not_to include('Lint/Void')
         expect(cop_names).not_to include('Metrics/LineLength')

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -29,7 +30,7 @@ describe RuboCop::Cop::Style::InfiniteLoop do
 
   it 'accepts Kernel#loop' do
     inspect_source(cop,
-                   ['loop { break if something }'])
+                   'loop { break if something }')
 
     expect(cop.offenses).to be_empty
   end

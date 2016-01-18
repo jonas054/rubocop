@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,7 @@ module RuboCop
       class SpaceAfterColon < Cop
         include IfNode
 
-        MSG = 'Space missing after colon.'
+        MSG = 'Space missing after colon.'.freeze
 
         def on_pair(node)
           oper = node.loc.operator
@@ -30,9 +31,7 @@ module RuboCop
         end
 
         def autocorrect(range)
-          @corrections << lambda do |corrector|
-            corrector.insert_after(range, ' ')
-          end
+          ->(corrector) { corrector.insert_after(range, ' ') }
         end
       end
     end

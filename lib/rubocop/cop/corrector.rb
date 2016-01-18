@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -17,19 +18,19 @@ module RuboCop
       #
       # @example
       #
-      # class AndOrCorrector
-      #   def initialize(node)
-      #     @node = node
+      #   class AndOrCorrector
+      #     def initialize(node)
+      #       @node = node
+      #     end
+      #
+      #     def call(corrector)
+      #       replacement = (@node.type == :and ? '&&' : '||')
+      #       corrector.replace(@node.loc.operator, replacement)
+      #     end
       #   end
       #
-      #   def call(corrector)
-      #     replacement = (@node.type == :and ? '&&' : '||')
-      #     corrector.replace(@node.loc.operator, replacement)
-      #   end
-      # end
-      #
-      # corrections = [AndOrCorrector.new(node)]
-      # corrector = Corrector.new(source_buffer, corrections)
+      #   corrections = [AndOrCorrector.new(node)]
+      #   corrector = Corrector.new(source_buffer, corrections)
       def initialize(source_buffer, corrections)
         @source_buffer = source_buffer
         @corrections = corrections
@@ -78,6 +79,30 @@ module RuboCop
       # @param [String] content
       def replace(range, content)
         @source_rewriter.replace(range, content)
+      end
+
+      # Removes `size` characters prior to the source range.
+      #
+      # @param [Parser::Source::Range] range
+      # @param [Integer] size
+      def remove_preceding(range, size)
+        to_remove = Parser::Source::Range.new(range.source_buffer,
+                                              range.begin_pos - size,
+                                              range.begin_pos)
+        @source_rewriter.remove(to_remove)
+      end
+
+      # Removes `size` characters from the beginning of the given range.
+      # If `size` is greater than the size of `range`, the removed region can
+      # overrun the end of `range`.
+      #
+      # @param [Parser::Source::Range] range
+      # @param [Integer] size
+      def remove_leading(range, size)
+        to_remove = Parser::Source::Range.new(range.source_buffer,
+                                              range.begin_pos,
+                                              range.begin_pos + size)
+        @source_rewriter.remove(to_remove)
       end
     end
   end

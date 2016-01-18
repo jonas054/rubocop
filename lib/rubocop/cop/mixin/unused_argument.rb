@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -26,9 +27,7 @@ module RuboCop
         def autocorrect(node)
           return if [:kwarg, :kwoptarg].include?(node.type)
 
-          @corrections << lambda do |corrector|
-            corrector.insert_before(node.loc.name, '_')
-          end
+          ->(corrector) { corrector.insert_before(node.loc.name, '_') }
         end
       end
     end

@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,7 +7,7 @@ module RuboCop
     # kinds of brackets.
     module SpaceInside
       include SurroundingSpace
-      MSG = 'Space inside %s detected.'
+      MSG = 'Space inside %s detected.'.freeze
 
       def investigate(processed_source)
         @processed_source = processed_source
@@ -27,7 +28,7 @@ module RuboCop
       end
 
       def autocorrect(range)
-        @corrections << ->(corrector) { corrector.remove(range) }
+        ->(corrector) { corrector.remove(range) }
       end
 
       # Wraps info about the brackets. Makes it easy to check whether a token

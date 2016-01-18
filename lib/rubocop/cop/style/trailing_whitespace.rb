@@ -1,11 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Style
       # This cop looks for trailing whitespace in the source code.
       class TrailingWhitespace < Cop
-        MSG = 'Trailing whitespace detected.'
+        MSG = 'Trailing whitespace detected.'.freeze
 
         def investigate(processed_source)
           processed_source.lines.each_with_index do |line, index|
@@ -20,7 +21,7 @@ module RuboCop
         end
 
         def autocorrect(range)
-          @corrections << ->(corrector) { corrector.remove(range) }
+          ->(corrector) { corrector.remove(range) }
         end
       end
     end

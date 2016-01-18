@@ -1,7 +1,7 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
-require 'stringio'
 
 module RuboCop
   module Formatter
@@ -33,7 +33,7 @@ module RuboCop
 
           let(:offense) do
             Cop::Offense.new(:convention, location,
-                             'This is a message.', 'CopName', corrected)
+                             'This is a message.', 'CopName', status)
           end
 
           let(:location) do
@@ -42,12 +42,36 @@ module RuboCop
             Parser::Source::Range.new(source_buffer, 0, 1)
           end
 
-          let(:corrected) { true }
+          let(:status) { :corrected }
 
           it 'prints [Corrected] along with message' do
             formatter.file_finished(file, [offense])
             expect(output.string)
               .to include(': [Corrected] This is a message.')
+          end
+        end
+
+        context 'when the offense message contains a newline' do
+          let(:file) { '/path/to/file' }
+
+          let(:offense) do
+            Cop::Offense.new(:error, location,
+                             "unmatched close parenthesis: /\n   world " \
+                             "# Some comment containing a )\n/",
+                             'CopName', :uncorrected)
+          end
+
+          let(:location) do
+            source_buffer = Parser::Source::Buffer.new('test', 1)
+            source_buffer.source = "a\n"
+            Parser::Source::Range.new(source_buffer, 0, 1)
+          end
+
+          it 'strips newlines out of the error message' do
+            formatter.file_finished(file, [offense])
+            expect(output.string).to eq(
+              '/path/to/file:1:1: E: unmatched close parenthesis: /    ' \
+              "world # Some comment containing a ) /\n")
           end
         end
       end

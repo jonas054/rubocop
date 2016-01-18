@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -9,7 +10,7 @@ describe RuboCop::Cop::Offense do
     Parser::Source::Range.new(source_buffer, 0, 1)
   end
   subject(:offense) do
-    described_class.new(:convention, location, 'message', 'CopName', true)
+    described_class.new(:convention, location, 'message', 'CopName', :corrected)
   end
 
   it 'has a few required attributes' do
@@ -61,7 +62,8 @@ describe RuboCop::Cop::Offense do
   describe '#severity_level' do
     subject(:severity_level) do
       described_class.new(severity, location, 'message', 'CopName')
-        .severity.level
+                     .severity
+                     .level
     end
 
     context 'when severity is :refactor' do
@@ -102,13 +104,13 @@ describe RuboCop::Cop::Offense do
       source_buffer = Parser::Source::Buffer.new('test', 1)
       source_buffer.source = source.join("\n")
       begin_pos = source[0...(line - 1)].reduce(0) do |a, e|
-        a + e.length + "\n".length
+        a + e.length + 1
       end + column
       Parser::Source::Range.new(source_buffer, begin_pos, begin_pos + 1)
     end
 
     # We want a nice table layout, so we allow space inside empty hashes.
-    # rubocop:disable Style/SpaceInsideHashLiteralBraces
+    # rubocop:disable Style/SpaceInsideHashLiteralBraces, Style/ExtraSpacing
     [
       [{                           }, {                           }, 0],
 

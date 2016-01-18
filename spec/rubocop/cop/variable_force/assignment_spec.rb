@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -6,8 +7,7 @@ describe RuboCop::Cop::VariableForce::Assignment do
   include AST::Sexp
 
   let(:ast) do
-    processed_source = RuboCop::ProcessedSource.new(source)
-    processed_source.ast
+    RuboCop::ProcessedSource.new(source, ruby_version).ast
   end
 
   let(:source) do

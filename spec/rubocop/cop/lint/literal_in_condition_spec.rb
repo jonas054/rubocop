@@ -1,11 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
 describe RuboCop::Cop::Lint::LiteralInCondition do
   subject(:cop) { described_class.new }
 
-  %w(1 2.0 [1] {}).each do |lit|
+  %w(1 2.0 [1] {} :sym :"#{a}").each do |lit|
     it "registers an offense for literal #{lit} in if" do
       inspect_source(cop,
                      ["if #{lit}",
@@ -24,11 +25,29 @@ describe RuboCop::Cop::Lint::LiteralInCondition do
       expect(cop.offenses.size).to eq(1)
     end
 
+    it "registers an offense for literal #{lit} in post-loop while" do
+      inspect_source(cop,
+                     ['begin',
+                      '  top',
+                      "end while(#{lit})"
+                     ])
+      expect(cop.offenses.size).to eq(1)
+    end
+
     it "registers an offense for literal #{lit} in until" do
       inspect_source(cop,
                      ["until #{lit}",
                       '  top',
                       'end'
+                     ])
+      expect(cop.offenses.size).to eq(1)
+    end
+
+    it "registers an offense for literal #{lit} in post-loop until" do
+      inspect_source(cop,
+                     ['begin',
+                      '  top',
+                      "end until #{lit}"
                      ])
       expect(cop.offenses.size).to eq(1)
     end

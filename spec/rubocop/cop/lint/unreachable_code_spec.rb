@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -9,7 +10,7 @@ describe RuboCop::Cop::Lint::UnreachableCode do
     it "registers an offense for #{t} before other statements" do
       inspect_source(cop,
                      ['foo = 5',
-                      "#{t}",
+                      t.to_s,
                       'bar'
                      ])
       expect(cop.offenses.size).to eq(1)

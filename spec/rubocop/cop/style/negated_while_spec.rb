@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -38,7 +39,7 @@ describe RuboCop::Cop::Style::NegatedWhile do
     expect(cop.offenses.map(&:line)).to eq([1, 4])
   end
 
-  it 'accepts an while where only part of the contition is negated' do
+  it 'accepts an while where only part of the condition is negated' do
     inspect_source(cop,
                    ['while !a_condition && another_condition',
                     '  some_method',
@@ -51,8 +52,10 @@ describe RuboCop::Cop::Style::NegatedWhile do
   end
 
   it 'autocorrects by replacing while not with until' do
-    corrected = autocorrect_source(cop, 'something while !x.even?')
-    expect(corrected).to eq 'something until x.even?'
+    corrected = autocorrect_source(cop, ['something while !x.even?',
+                                         'something while(!x.even?)'])
+    expect(corrected).to eq ['something until x.even?',
+                             'something until(x.even?)'].join("\n")
   end
 
   it 'autocorrects by replacing until not with while' do

@@ -1,7 +1,6 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
-require 'fileutils'
-require 'tmpdir'
 require 'spec_helper'
 require 'timeout'
 
@@ -14,1386 +13,20 @@ describe RuboCop::CLI, :isolated_environment do
     $stdout = StringIO.new
     $stderr = StringIO.new
     RuboCop::ConfigLoader.debug = false
+
+    # OPTIMIZE: Makes these specs faster. Work directory (the parent of
+    # .rubocop_cache) is removed afterwards anyway.
+    RuboCop::ResultCache.inhibit_cleanup = true
   end
 
   after(:each) do
     $stdout = STDOUT
     $stderr = STDERR
+    RuboCop::ResultCache.inhibit_cleanup = false
   end
 
   def abs(path)
     File.expand_path(path)
-  end
-
-  describe 'option' do
-    describe '--version' do
-      it 'exits cleanly' do
-        expect { cli.run ['-v'] }.to exit_with_code(0)
-        expect { cli.run ['--version'] }.to exit_with_code(0)
-        expect($stdout.string).to eq((RuboCop::Version::STRING + "\n") * 2)
-      end
-    end
-
-    describe '--auto-correct' do
-      it 'corrects SymbolProc and SpaceBeforeBlockBraces offences' do
-        source = ['foo.map{ |a| a.nil? }']
-        create_file('example.rb', source)
-        expect(cli.run(['-D', '--auto-correct'])).to eq(1)
-        corrected = "foo.map(&:nil?)\n"
-        expect(IO.read('example.rb')).to eq(corrected)
-      end
-
-      it 'corrects complicated cases conservatively' do
-        # Two cops make corrections here; Style/BracesAroundHashParameters, and
-        # Style/AlignHash. Because they make minimal corrections relating only
-        # to their specific areas, and stay away from cleaning up extra
-        # whitespace in the process, the combined changes don't interfere with
-        # eachother and the result is semantically the same as the starting
-        # point.
-        source = ['# encoding: utf-8',
-                  'expect(subject[:address]).to eq({',
-                  "  street1:     '1 Market',",
-                  "  street2:     '#200',",
-                  "  city:        'Some Town',",
-                  "  state:       'CA',",
-                  "  postal_code: '99999-1111'",
-                  '})']
-        create_file('example.rb', source)
-        expect(cli.run(['-D', '--auto-correct'])).to eq(1)
-        corrected =
-          ['# encoding: utf-8',
-           'expect(subject[:address]).to eq(',
-           "  street1:     '1 Market',",
-           "  street2:     '#200',",
-           "  city:        'Some Town',",
-           "  state:       'CA',",
-           "  postal_code: '99999-1111'",
-           ')']
-        expect(IO.read('example.rb')).to eq(corrected.join("\n") + "\n")
-      end
-
-      it 'honors Exclude settings in individual cops' do
-        source = ['# encoding: utf-8',
-                  'puts %x(ls)']
-        create_file('example.rb', source)
-        create_file('.rubocop.yml', ['Style/UnneededPercentX:',
-                                     '  Exclude:',
-                                     '    - example.rb'])
-        expect(cli.run(['--auto-correct'])).to eq(0)
-        expect($stdout.string).to include('no offenses detected')
-        expect(IO.read('example.rb')).to eq(source.join("\n") + "\n")
-      end
-
-      it 'corrects code with indentation problems' do
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'module Bar',
-                                   'class Goo',
-                                   '  def something',
-                                   '    first call',
-                                   "      do_other 'things'",
-                                   '      if other > 34',
-                                   '        more_work',
-                                   '      end',
-                                   '  end',
-                                   'end',
-                                   'end',
-                                   '',
-                                   'module Foo',
-                                   'class Bar',
-                                   '',
-                                   '  stuff = [',
-                                   '            {',
-                                   "              some: 'hash',",
-                                   '            },',
-                                   '                 {',
-                                   "              another: 'hash',",
-                                   "              with: 'more'",
-                                   '            },',
-                                   '          ]',
-                                   'end',
-                                   'end'
-                                  ])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'module Bar',
-                  '  class Goo',
-                  '    def something',
-                  '      first call',
-                  "      do_other 'things'",
-                  '      if other > 34',
-                  '        more_work',
-                  '      end',
-                  '    end',
-                  '  end',
-                  'end',
-                  '',
-                  'module Foo',
-                  '  class Bar',
-                  '    stuff = [',
-                  '      {',
-                  "        some: 'hash'",
-                  '      },',
-                  '      {',
-                  "        another: 'hash',",
-                  "        with: 'more'",
-                  '      }',
-                  '    ]',
-                  '  end',
-                  'end',
-                  ''].join("\n"))
-      end
-
-      it 'can change block comments and indent them' do
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'module Foo',
-                                   'class Bar',
-                                   '=begin',
-                                   'This is a nice long',
-                                   'comment',
-                                   'which spans a few lines',
-                                   '=end',
-                                   '  def baz',
-                                   '    do_something',
-                                   '  end',
-                                   'end',
-                                   'end'])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'module Foo',
-                  '  class Bar',
-                  '    # This is a nice long',
-                  '    # comment',
-                  '    # which spans a few lines',
-                  '    def baz',
-                  '      do_something',
-                  '    end',
-                  '  end',
-                  'end',
-                  ''].join("\n"))
-      end
-
-      it 'can correct two problems with blocks' do
-        # {} should be do..end and space is missing.
-        create_file('example.rb', ['# encoding: utf-8',
-                                   '(1..10).each{ |i|',
-                                   '  puts i',
-                                   '}'])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  '(1..10).each do |i|',
-                  '  puts i',
-                  'end',
-                  ''].join("\n"))
-      end
-
-      it 'can handle spaces when removing braces' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     "assert_post_status_code 400, 's', {:type => 'bad'}"])
-        expect(cli.run(%w(--auto-correct --format emacs))).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  "assert_post_status_code 400, 's', type: 'bad'",
-                  ''].join("\n"))
-        e = abs('example.rb')
-        expect($stdout.string)
-          .to eq(["#{e}:2:35: C: [Corrected] Redundant curly braces around " \
-                  'a hash parameter.',
-                  "#{e}:2:35: C: [Corrected] Use the new Ruby 1.9 hash " \
-                  'syntax.',
-                  # TODO: Don't report that a problem is corrected when it
-                  # actually went away due to another correction.
-                  "#{e}:2:35: C: [Corrected] Space inside { missing.",
-                  # TODO: Don't report duplicates (HashSyntax in this case).
-                  "#{e}:2:36: C: [Corrected] Use the new Ruby 1.9 hash " \
-                  'syntax.',
-                  "#{e}:2:50: C: [Corrected] Space inside } missing.",
-                  ''].join("\n"))
-      end
-
-      # A case where two cops, EmptyLinesAroundBody and EmptyLines, try to
-      # remove the same line in autocorrect.
-      it 'can correct two empty lines at end of class body' do
-        create_file('example.rb', ['class Test',
-                                   '  def f',
-                                   '  end',
-                                   '',
-                                   '',
-                                   'end'])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['class Test',
-                                             '  def f',
-                                             '  end',
-                                             'end',
-                                             ''].join("\n"))
-      end
-
-      # A case where WordArray's correction can be clobbered by
-      # AccessModifierIndentation's correction.
-      it 'can correct indentation and another thing' do
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'class Dsl',
-                                   'private',
-                                   '  A = ["git", "path",]',
-                                   'end'])
-        expect(cli.run(%w(--auto-correct --format emacs))).to eq(1)
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             'class Dsl',
-                                             '  private',
-                                             '',
-                                             '  A = %w(git path)',
-                                             'end',
-                                             ''].join("\n"))
-        e = abs('example.rb')
-        expect($stdout.string)
-          .to eq(["#{e}:2:1: C: Missing top-level class documentation " \
-                  'comment.',
-                  "#{e}:3:1: C: [Corrected] Indent access modifiers like " \
-                  '`private`.',
-                  "#{e}:3:1: C: [Corrected] Keep a blank line before and " \
-                  'after `private`.',
-                  "#{e}:3:3: W: Useless `private` access modifier.",
-                  "#{e}:3:3: C: [Corrected] Keep a blank line before and " \
-                  'after `private`.',
-                  "#{e}:4:7: C: [Corrected] Use `%w` or `%W` " \
-                  'for array of words.',
-                  "#{e}:4:8: C: [Corrected] Prefer single-quoted strings " \
-                  "when you don't need string interpolation or special " \
-                  'symbols.',
-                  "#{e}:4:15: C: [Corrected] Prefer single-quoted strings " \
-                  "when you don't need string interpolation or special " \
-                  'symbols.',
-                  "#{e}:4:21: C: [Corrected] Avoid comma after the last item " \
-                  'of an array.',
-                  "#{e}:5:7: C: [Corrected] Use `%w` or `%W` " \
-                  'for array of words.',
-                  "#{e}:5:8: C: [Corrected] Prefer single-quoted strings " \
-                  "when you don't need string interpolation or special " \
-                  'symbols.',
-                  "#{e}:5:15: C: [Corrected] Prefer single-quoted strings " \
-                  "when you don't need string interpolation or special " \
-                  'symbols.',
-                  "#{e}:5:21: C: [Corrected] Avoid comma after the last item " \
-                  'of an array.',
-                  ''].join("\n"))
-      end
-
-      # A case where the same cop could try to correct an offense twice in one
-      # place.
-      it 'can correct empty line inside special form of nested modules' do
-        create_file('example.rb', ['module A module B',
-                                   '',
-                                   'end end'])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb')).to eq(['module A module B',
-                                             'end end',
-                                             ''].join("\n"))
-      end
-
-      it 'can correct single line methods' do
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'def func1; do_something end # comment',
-                                   'def func2() do_1; do_2; end'])
-        expect(cli.run(%w(--auto-correct --format offenses))).to eq(1)
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             '# comment',
-                                             'def func1',
-                                             '  do_something',
-                                             'end',
-                                             '',
-                                             'def func2',
-                                             '  do_1',
-                                             '  do_2',
-                                             'end',
-                                             ''].join("\n"))
-        expect($stdout.string).to eq(['',
-                                      '10  Style/TrailingWhitespace',
-                                      '5   Style/Semicolon',
-                                      '3   Style/SingleLineMethods',
-                                      '1   Style/DefWithParentheses',
-                                      '1   Style/EmptyLineBetweenDefs',
-                                      '--',
-                                      '20  Total',
-                                      '',
-                                      ''].join("\n"))
-      end
-
-      # In this example, the auto-correction (changing "raise" to "fail")
-      # creates a new problem (alignment of parameters), which is also
-      # corrected automatically.
-      it 'can correct a problems and the problem it creates' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'raise NotImplementedError,',
-                     "      'Method should be overridden in child classes'"])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'fail NotImplementedError,',
-                  "     'Method should be overridden in child classes'",
-                  ''].join("\n"))
-        expect($stdout.string)
-          .to eq(['Inspecting 1 file',
-                  'C',
-                  '',
-                  'Offenses:',
-                  '',
-                  'example.rb:2:1: C: [Corrected] Use fail instead of ' \
-                  'raise to signal exceptions.',
-                  'raise NotImplementedError,',
-                  '^^^^^',
-                  'example.rb:3:7: C: [Corrected] Align the parameters of a ' \
-                  'method call if they span more than one line.',
-                  "      'Method should be overridden in child classes'",
-                  '      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^',
-                  '',
-                  '1 file inspected, 2 offenses detected, 2 offenses ' \
-                  'corrected',
-                  ''].join("\n"))
-      end
-
-      # Thanks to repeated auto-correction, we can get rid of the trailing
-      # spaces, and then the extra empty line.
-      it 'can correct two problems in the same place' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     '# Example class.',
-                     'class Klass',
-                     '  ',
-                     '  def f',
-                     '  end',
-                     'end'])
-        expect(cli.run(['--auto-correct'])).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  '# Example class.',
-                  'class Klass',
-                  '  def f',
-                  '  end',
-                  'end',
-                  ''].join("\n"))
-        expect($stderr.string).to eq('')
-        expect($stdout.string)
-          .to eq(['Inspecting 1 file',
-                  'C',
-                  '',
-                  'Offenses:',
-                  '',
-                  'example.rb:4:1: C: [Corrected] Extra empty line detected ' \
-                  'at class body beginning.',
-                  'example.rb:4:1: C: [Corrected] Trailing whitespace ' \
-                  'detected.',
-                  '',
-                  '1 file inspected, 2 offenses detected, 2 offenses ' \
-                  'corrected',
-                  ''].join("\n"))
-      end
-
-      it 'can correct MethodDefParentheses and other offense' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'def primes limit',
-                     '  1.upto(limit).select { |i| i.even? }',
-                     'end'])
-        expect(cli.run(%w(-D --auto-correct))).to eq(1)
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'def primes(limit)',
-                  '  1.upto(limit).select(&:even?)',
-                  'end',
-                  ''].join("\n"))
-        expect($stdout.string)
-          .to eq(['Inspecting 1 file',
-                  'C',
-                  '',
-                  'Offenses:',
-                  '',
-                  'example.rb:2:12: C: [Corrected] ' \
-                  'Style/MethodDefParentheses: ' \
-                  'Use def with parentheses when there are parameters.',
-                  'def primes limit',
-                  '           ^^^^^',
-                  'example.rb:3:3: C: [Corrected] Style/SymbolProc: ' \
-                  'Pass &:even? as an argument to select instead of a block.',
-                  '  1.upto(limit).select { |i| i.even? }',
-                  '  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^',
-                  '',
-                  '1 file inspected, 2 offenses detected, 2 offenses ' \
-                  'corrected',
-                  ''].join("\n"))
-      end
-
-      it 'can correct WordArray and SpaceAfterComma offenses' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     "f(type: ['offline','offline_payment'],",
-                     "  bar_colors: ['958c12','953579','ff5800','0085cc'])"])
-        expect(cli.run(%w(-D --auto-correct --format o))).to eq(1)
-        expect($stdout.string)
-          .to eq(['',
-                  '4  Style/SpaceAfterComma',
-                  '2  Style/WordArray',
-                  '--',
-                  '6  Total',
-                  '',
-                  ''].join("\n"))
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'f(type: %w(offline offline_payment),',
-                  '  bar_colors: %w(958c12 953579 ff5800 0085cc))',
-                  ''].join("\n"))
-      end
-
-      it 'can correct SpaceAfterComma and HashSyntax offenses' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     "I18n.t('description',:property_name => property.name)"])
-        expect(cli.run(%w(-D --auto-correct --format emacs))).to eq(1)
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:21: C: [Corrected] " \
-                  'Style/SpaceAfterComma: Space missing after comma.',
-                  "#{abs('example.rb')}:2:22: C: [Corrected] " \
-                  'Style/HashSyntax: Use the new Ruby 1.9 hash syntax.',
-                  ''].join("\n"))
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  "I18n.t('description', property_name: property.name)",
-                  ''].join("\n"))
-      end
-
-      it 'can correct HashSyntax and SpaceAroundOperators offenses' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     '{ :b=>1 }'])
-        expect(cli.run(%w(-D --auto-correct --format emacs))).to eq(1)
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             '{ b: 1 }',
-                                             ''].join("\n"))
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:3: C: [Corrected] " \
-                  'Style/HashSyntax: Use the new Ruby 1.9 hash syntax.',
-                  "#{abs('example.rb')}:2:5: C: [Corrected] " \
-                  'Style/SpaceAroundOperators: Surrounding space missing for ' \
-                  "operator '=>'.",
-                  ''].join("\n"))
-      end
-
-      it 'can correct HashSyntax when --only is used' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     '{ :b=>1 }'])
-        expect(cli.run(%w(--auto-correct -f emacs
-                          --only Style/HashSyntax))).to eq(1)
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             '{ b: 1 }',
-                                             ''].join("\n"))
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:3: C: [Corrected] Use the new " \
-                  'Ruby 1.9 hash syntax.',
-                  ''].join("\n"))
-      end
-
-      it 'can correct TrailingBlankLines and TrailingWhitespace offenses' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     '',
-                     '  ',
-                     '',
-                     ''])
-        expect(cli.run(%w(--auto-correct --format emacs))).to eq(1)
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             ''].join("\n"))
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:1: C: [Corrected] 3 trailing " \
-                  'blank lines detected.',
-                  "#{abs('example.rb')}:3:1: C: [Corrected] Trailing " \
-                  'whitespace detected.',
-                  ''].join("\n"))
-      end
-
-      it 'can correct MethodCallParentheses and EmptyLiteral offenses' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'Hash.new()'])
-        expect(cli.run(%w(--auto-correct --format emacs))).to eq(1)
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             '{}',
-                                             ''].join("\n"))
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:1: C: [Corrected] Use hash " \
-                  'literal `{}` instead of `Hash.new`.',
-                  "#{abs('example.rb')}:2:9: C: [Corrected] Do not use " \
-                  'parentheses for method calls with no arguments.',
-                  ''].join("\n"))
-      end
-
-      it 'can correct IndentHash offenses with separator style' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'CONVERSION_CORRESPONDENCE = {',
-                     '              match_for_should: :match,',
-                     '          match_for_should_not: :match_when_negated,',
-                     '    failure_message_for_should: :failure_message,',
-                     'failure_message_for_should_not: :failure_message_when',
-                     '}'])
-        create_file('.rubocop.yml',
-                    ['Style/AlignHash:',
-                     '  EnforcedColonStyle: separator'])
-        expect(cli.run(%w(--auto-correct))).to eq(1)
-        expect(IO.read('example.rb'))
-          .to eq(['# encoding: utf-8',
-                  'CONVERSION_CORRESPONDENCE = {',
-                  '                match_for_should: :match,',
-                  '            match_for_should_not: :match_when_negated,',
-                  '      failure_message_for_should: :failure_message,',
-                  '  failure_message_for_should_not: :failure_message_when',
-                  '}',
-                  ''].join("\n"))
-      end
-
-      it 'does not say [Corrected] if correction was avoided' do
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'a = c and b',
-                                   'not a && b',
-                                   'func a do b end'])
-        expect(cli.run(%w(-a -f simple))).to eq(1)
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             'a = c and b',
-                                             'not a && b',
-                                             'func a do b end',
-                                             ''].join("\n"))
-        expect($stdout.string)
-          .to eq(['== example.rb ==',
-                  'C:  2:  7: Use && instead of and.',
-                  'C:  3:  1: Use ! instead of not.',
-                  'C:  4:  8: Prefer {...} over do...end for single-line ' \
-                  'blocks.',
-                  '',
-                  '1 file inspected, 3 offenses detected',
-                  ''].join("\n"))
-      end
-
-      it 'does not hang SpaceAfterPunctuation and SpaceInsideParens' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'some_method(a, )'])
-        Timeout.timeout(10) do
-          expect(cli.run(%w(--auto-correct))).to eq(1)
-        end
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             'some_method(a)',
-                                             ''].join("\n"))
-      end
-
-      it 'does not hang SpaceAfterPunctuation and SpaceInsideBrackets' do
-        create_file('example.rb',
-                    ['# encoding: utf-8',
-                     'puts [1, ]'])
-        Timeout.timeout(10) do
-          expect(cli.run(%w(--auto-correct))).to eq(1)
-        end
-        expect($stderr.string).to eq('')
-        expect(IO.read('example.rb')).to eq(['# encoding: utf-8',
-                                             'puts [1]',
-                                             ''].join("\n"))
-      end
-    end
-
-    describe '--auto-gen-config' do
-      before(:each) do
-        RuboCop::Formatter::DisabledConfigFormatter
-          .config_to_allow_offenses = {}
-      end
-
-      it 'overwrites an existing todo file' do
-        create_file('example1.rb', ['# encoding: utf-8',
-                                    'x= 0 ',
-                                    '#' * 85,
-                                    'y ',
-                                    'puts x'])
-        create_file('.rubocop_todo.yml', ['Metrics/LineLength:',
-                                          '  Enabled: false'])
-        create_file('.rubocop.yml', ['inherit_from: .rubocop_todo.yml'])
-        expect(cli.run(['--auto-gen-config'])).to eq(1)
-        expect(IO.readlines('.rubocop_todo.yml')[7..-1].map(&:chomp))
-          .to eq(['# Offense count: 1',
-                  '# Configuration parameters: AllowURI, URISchemes.',
-                  'Metrics/LineLength:',
-                  '  Max: 85',
-                  '',
-                  '# Offense count: 1',
-                  '# Cop supports --auto-correct.',
-                  'Style/SpaceAroundOperators:',
-                  '  Enabled: false',
-                  '',
-                  '# Offense count: 2',
-                  '# Cop supports --auto-correct.',
-                  'Style/TrailingWhitespace:',
-                  '  Enabled: false'])
-
-        # Create new CLI instance to avoid using cached configuration.
-        new_cli = described_class.new
-
-        expect(new_cli.run(['example1.rb'])).to eq(0)
-      end
-
-      it 'exits with error if file arguments are given' do
-        create_file('example1.rb', ['# encoding: utf-8',
-                                    'x= 0 ',
-                                    '#' * 85,
-                                    'y ',
-                                    'puts x'])
-        expect { cli.run(['--auto-gen-config', 'example1.rb']) }
-          .to exit_with_code(1)
-        expect($stderr.string)
-          .to eq(['--auto-gen-config can not be combined with any other ' \
-                  'arguments.',
-                  ''].join("\n"))
-        expect($stdout.string).to eq('')
-      end
-
-      it 'can generate a todo list' do
-        create_file('example1.rb', ['# encoding: utf-8',
-                                    '$x= 0 ',
-                                    '#' * 90,
-                                    '#' * 85,
-                                    'y ',
-                                    'puts x'])
-        create_file('example2.rb', ['# encoding: utf-8',
-                                    "\tx = 0",
-                                    'puts x'])
-        expect(cli.run(['--auto-gen-config'])).to eq(1)
-        expect($stderr.string).to eq('')
-        expect($stdout.string)
-          .to include(['Created .rubocop_todo.yml.',
-                       'Run `rubocop --config .rubocop_todo.yml`, or',
-                       'add inherit_from: .rubocop_todo.yml in a ' \
-                       '.rubocop.yml file.',
-                       ''].join("\n"))
-        expected =
-          ['# This configuration was generated by `rubocop --auto-gen-config`',
-           /# on .* using RuboCop version .*/,
-           '# The point is for the user to remove these configuration records',
-           '# one by one as the offenses are removed from the code base.',
-           '# Note that changes in the inspected code, or installation of new',
-           '# versions of RuboCop, may require this file to be generated ' \
-           'again.',
-           '',
-           '# Offense count: 2',
-           '# Configuration parameters: AllowURI, URISchemes.',
-           'Metrics/LineLength:',
-           '  Max: 90',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/CommentIndentation:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Configuration parameters: AllowedVariables.',
-           'Style/GlobalVars:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/IndentationConsistency:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/SpaceAroundOperators:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/Tab:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 2',
-           '# Cop supports --auto-correct.',
-           'Style/TrailingWhitespace:',
-           '  Enabled: false']
-        actual = IO.read('.rubocop_todo.yml').split($RS)
-        expected.each_with_index do |line, ix|
-          if line.is_a?(String)
-            expect(actual[ix]).to eq(line)
-          else
-            expect(actual[ix]).to match(line)
-          end
-        end
-      end
-
-      it 'does not generate configuration for the Syntax cop' do
-        create_file('example1.rb', ['# encoding: utf-8',
-                                    'x = < ', # Syntax error
-                                    'puts x'])
-        create_file('example2.rb', ['# encoding: utf-8',
-                                    "\tx = 0",
-                                    'puts x'])
-        expect(cli.run(['--auto-gen-config'])).to eq(1)
-        expect($stderr.string).to eq('')
-        expected =
-          ['# This configuration was generated by `rubocop --auto-gen-config`',
-           /# on .* using RuboCop version .*/,
-           '# The point is for the user to remove these configuration records',
-           '# one by one as the offenses are removed from the code base.',
-           '# Note that changes in the inspected code, or installation of new',
-           '# versions of RuboCop, may require this file to be generated ' \
-           'again.',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/CommentIndentation:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/IndentationConsistency:',
-           '  Enabled: false',
-           '',
-           '# Offense count: 1',
-           '# Cop supports --auto-correct.',
-           'Style/Tab:',
-           '  Enabled: false']
-        actual = IO.read('.rubocop_todo.yml').split($RS)
-        expect(actual.length).to eq(expected.length)
-        expected.each_with_index do |line, ix|
-          if line.is_a?(String)
-            expect(actual[ix]).to eq(line)
-          else
-            expect(actual[ix]).to match(line)
-          end
-        end
-      end
-
-      it 'generates a todo list that removes the reports' do
-        RuboCop::Cop::Style::RegexpLiteral.slash_count = 0
-        create_file('example.rb', ['# encoding: utf-8',
-                                   'y.gsub!(%r{abc/xyz}, "#{x}")'])
-        expect(cli.run(%w(--format emacs))).to eq(1)
-        expect($stdout.string)
-          .to eq(["#{abs('example.rb')}:2:9: C: Use %r only for regular " \
-                  "expressions matching more than 1 '/' character.",
-                  ''].join("\n"))
-        expect(cli.run(['--auto-gen-config'])).to eq(1)
-        expected =
-          ['# This configuration was generated by `rubocop --auto-gen-config`',
-           /# on .* using RuboCop version .*/,
-           '# The point is for the user to remove these configuration records',
-           '# one by one as the offenses are removed from the code base.',
-           '# Note that changes in the inspected code, or installation of new',
-           '# versions of RuboCop, may require this file to be generated ' \
-           'again.',
-           '',
-           '# Offense count: 1',
-           '# Configuration parameters: MaxSlashes.',
-           'Style/RegexpLiteral:',
-           '  Enabled: false']
-        actual = IO.read('.rubocop_todo.yml').split($RS)
-        expected.each_with_index do |line, ix|
-          if line.is_a?(String)
-            expect(actual[ix]).to eq(line)
-          else
-            expect(actual[ix]).to match(line)
-          end
-        end
-        $stdout = StringIO.new
-        result = cli.run(%w(--config .rubocop_todo.yml --format emacs))
-        expect($stdout.string).to eq('')
-        expect(result).to eq(0)
-      end
-    end
-
-    describe '--only' do
-      context 'when one cop is given' do
-        it 'runs just one cop' do
-          create_file('example.rb', ['if x== 0 ',
-                                     "\ty",
-                                     'end'])
-          # IfUnlessModifier depends on the configuration of LineLength.
-
-          expect(cli.run(['--format', 'simple',
-                          '--only', 'Style/IfUnlessModifier',
-                          'example.rb'])).to eq(1)
-          expect($stdout.string)
-            .to eq(['== example.rb ==',
-                    'C:  1:  1: Favor modifier if usage when ' \
-                    'having a single-line body. Another good alternative is ' \
-                    'the usage of control flow &&/||.',
-                    '',
-                    '1 file inspected, 1 offense detected',
-                    ''].join("\n"))
-        end
-
-        it 'exits with error if an incorrect cop name is passed' do
-          create_file('example.rb', ['if x== 0 ',
-                                     "\ty",
-                                     'end'])
-          expect(cli.run(['--only', 'Style/123'])).to eq(1)
-          expect($stderr.string).to include('Unrecognized cop name: Style/123.')
-        end
-
-        it 'accepts cop names from plugins' do
-          create_file('.rubocop.yml', ['require: rubocop_ext',
-                                       '',
-                                       'Style/SomeCop:',
-                                       '  Description: Something',
-                                       '  Enabled: true'])
-          create_file('rubocop_ext.rb', ['module RuboCop',
-                                         '  module Cop',
-                                         '    module Style',
-                                         '      class SomeCop < Cop',
-                                         '      end',
-                                         '    end',
-                                         '  end',
-                                         'end'])
-          create_file('redirect.rb', '$stderr = STDOUT')
-          rubocop = "#{RuboCop::ConfigLoader::RUBOCOP_HOME}/bin/rubocop"
-          # Since we define a new cop class, we have to do this in a separate
-          # process. Otherwise, the extra cop will affect other specs.
-          output =
-            `ruby -I . #{rubocop} --require redirect.rb --only Style/SomeCop`
-          expect($CHILD_STATUS.success?).to be_truthy
-          # The warning about the unrecognized cop is expected. It's given due
-          # to the fact that we haven't supplied any default configuration for
-          # rubocop_ext in this example.
-          expect(output)
-            .to eq(['Warning: unrecognized cop Style/SomeCop found in ' \
-                    "#{abs('.rubocop.yml')}",
-                    'Inspecting 2 files',
-                    '..',
-                    '',
-                    '2 files inspected, no offenses detected',
-                    ''].join("\n"))
-        end
-
-        context 'without using namespace' do
-          it 'runs just one cop' do
-            create_file('example.rb', ['if x== 0 ',
-                                       "\ty",
-                                       'end'])
-
-            expect(cli.run(['--format', 'simple',
-                            '--display-cop-names',
-                            '--only', 'IfUnlessModifier',
-                            'example.rb'])).to eq(1)
-            expect($stdout.string)
-              .to eq(['== example.rb ==',
-                      'C:  1:  1: Style/IfUnlessModifier: Favor modifier if ' \
-                      'usage when having a single-line body. Another good ' \
-                      'alternative is the usage of control flow &&/||.',
-                      '',
-                      '1 file inspected, 1 offense detected',
-                      ''].join("\n"))
-          end
-        end
-
-        it 'enables the given cop' do
-          create_file('example.rb',
-                      ['x = 0 ',
-                       # Disabling comments still apply.
-                       '# rubocop:disable Style/TrailingWhitespace',
-                       'y = 1  '])
-
-          create_file('.rubocop.yml', ['Style/TrailingWhitespace:',
-                                       '  Enabled: false'])
-
-          expect(cli.run(['--format', 'simple',
-                          '--only', 'Style/TrailingWhitespace',
-                          'example.rb'])).to eq(1)
-          expect($stderr.string).to eq('')
-          expect($stdout.string)
-            .to eq(['== example.rb ==',
-                    'C:  1:  6: Trailing whitespace detected.',
-                    '',
-                    '1 file inspected, 1 offense detected',
-                    ''].join("\n"))
-        end
-      end
-
-      context 'when several cops are given' do
-        it 'runs the given cops' do
-          create_file('example.rb', ['if x== 100000000000000 ',
-                                     "\ty",
-                                     'end'])
-          expect(cli.run(['--format', 'simple',
-                          '--only',
-                          'Style/IfUnlessModifier,Style/Tab,' \
-                          'Style/SpaceAroundOperators',
-                          'example.rb'])).to eq(1)
-          expect($stderr.string).to eq('')
-          expect($stdout.string)
-            .to eq(['== example.rb ==',
-                    'C:  1:  1: Favor modifier if usage when ' \
-                    'having a single-line body. Another good alternative is ' \
-                    'the usage of control flow &&/||.',
-                    "C:  1:  5: Surrounding space missing for operator '=='.",
-                    'C:  2:  1: Tab detected.',
-                    '',
-                    '1 file inspected, 3 offenses detected',
-                    ''].join("\n"))
-        end
-
-        context 'and --lint' do
-          it 'runs the given cops plus all enabled lint cops' do
-            create_file('example.rb', ['if x== 100000000000000 ',
-                                       "\ty = 3",
-                                       '  end'])
-            create_file('.rubocop.yml', ['Lint/EndAlignment:',
-                                         '  Enabled: false'])
-            expect(cli.run(['--format', 'simple',
-                            '--only', 'Style/Tab,Style/SpaceAroundOperators',
-                            '--lint',
-                            'example.rb'])).to eq(1)
-            expect($stdout.string)
-              .to eq(['== example.rb ==',
-                      'C:  1:  5: Surrounding space missing for operator ' \
-                      "'=='.",
-                      'C:  2:  1: Tab detected.',
-                      'W:  2:  2: Useless assignment to variable - y.',
-                      '',
-                      '1 file inspected, 3 offenses detected',
-                      ''].join("\n"))
-          end
-        end
-      end
-    end
-
-    describe '--lint' do
-      it 'runs only lint cops' do
-        create_file('example.rb', ['if 0 ',
-                                   "\ty",
-                                   'end'])
-        # IfUnlessModifier depends on the configuration of LineLength.
-
-        expect(cli.run(['--format', 'simple', '--lint',
-                        'example.rb'])).to eq(1)
-        expect($stdout.string)
-          .to eq(['== example.rb ==',
-                  'W:  1:  4: Literal 0 appeared in a condition.',
-                  '',
-                  '1 file inspected, 1 offense detected',
-                  ''].join("\n"))
-      end
-    end
-
-    describe '-d/--debug' do
-      it 'shows config files' do
-        create_file('example1.rb', "\tputs 0")
-        expect(cli.run(['--debug', 'example1.rb'])).to eq(1)
-        home = File.dirname(File.dirname(File.dirname(__FILE__)))
-        expect($stdout.string.lines.grep(/configuration/).map(&:chomp))
-          .to eq(["For #{abs('')}:" \
-                  " configuration from #{home}/config/default.yml",
-                  "Inheriting configuration from #{home}/config/enabled.yml",
-                  "Inheriting configuration from #{home}/config/disabled.yml"
-                 ])
-      end
-
-      it 'shows cop names' do
-        create_file('example1.rb', "\tputs 0")
-        expect(cli.run(['--format',
-                        'emacs',
-                        '--debug',
-                        'example1.rb'])).to eq(1)
-        expect($stdout.string.lines.to_a[-1])
-          .to eq(["#{abs('example1.rb')}:1:1: C: Style/Tab: Tab detected.",
-                  ''].join("\n"))
-      end
-    end
-
-    describe '-D/--display-cop-names' do
-      it 'shows cop names' do
-        create_file('example1.rb', "\tputs 0")
-        expect(cli.run(['--format',
-                        'emacs',
-                        '--debug',
-                        'example1.rb'])).to eq(1)
-        expect($stdout.string.lines.to_a[-1])
-          .to eq(["#{abs('example1.rb')}:1:1: C: Style/Tab: Tab detected.",
-                  ''].join("\n"))
-      end
-    end
-
-    describe '--show-cops' do
-      shared_examples(:prints_config) do
-        it 'prints the current configuration' do
-          out = stdout.lines.to_a
-          printed_config = YAML.load(out.join)
-          cop_names = (cop_list[0] || '').split(',')
-          cop_names.each do |cop_name|
-            global_conf[cop_name].each do |key, value|
-              printed_value = printed_config[cop_name][key]
-              expect(printed_value).to eq(value)
-            end
-          end
-        end
-      end
-
-      let(:cops) { RuboCop::Cop::Cop.all }
-
-      let(:global_conf) do
-        config_path =
-          RuboCop::ConfigLoader.configuration_file_for(Dir.pwd.to_s)
-        RuboCop::ConfigLoader.configuration_from_file(config_path)
-      end
-
-      let(:stdout) { $stdout.string }
-
-      before do
-        create_file('.rubocop.yml', ['Metrics/LineLength:',
-                                     '  Max: 110'])
-        expect { cli.run ['--show-cops'] + cop_list }.to exit_with_code(0)
-      end
-
-      context 'with no args' do
-        let(:cop_list) { [] }
-
-        # Extracts the first line out of the description
-        def short_description_of_cop(cop)
-          desc = full_description_of_cop(cop)
-          desc ? desc.lines.first.strip : ''
-        end
-
-        # Gets the full description of the cop or nil if no description is set.
-        def full_description_of_cop(cop)
-          cop_config = global_conf.for_cop(cop)
-          cop_config['Description']
-        end
-
-        it 'prints all available cops and their description' do
-          cops.each do |cop|
-            expect(stdout).to include cop.cop_name
-            # Because of line breaks, we will only find the beginning.
-            expect(stdout).to include short_description_of_cop(cop)[0..60]
-          end
-        end
-
-        it 'prints all types' do
-          cops
-            .types
-            .map(&:to_s)
-            .map(&:capitalize)
-            .each { |type| expect(stdout).to include(type) }
-        end
-
-        it 'prints all cops in their right type listing' do
-          lines = stdout.lines
-          lines.slice_before(/Type /).each do |slice|
-            types = cops.types.map(&:to_s).map(&:capitalize)
-            current = types.delete(slice.shift[/Type '(?<c>[^']+)'/, 'c'])
-            # all cops in their type listing
-            cops.with_type(current).each do |cop|
-              expect(slice.any? { |l| l.include? cop.cop_name }).to be_truthy
-            end
-
-            # no cop in wrong type listing
-            types.each do |type|
-              cops.with_type(type).each do |cop|
-                expect(slice.any? { |l| l.include? cop.cop_name }).to be_falsey
-              end
-            end
-          end
-        end
-
-        include_examples :prints_config
-      end
-
-      context 'with one cop given' do
-        let(:cop_list) { ['Style/Tab'] }
-
-        it 'prints that cop and nothing else' do
-          expect(stdout).to eq(
-            ['# Supports --auto-correct',
-             'Style/Tab:',
-             '  Description: No hard tabs.',
-             '  StyleGuide: ' \
-             'https://github.com/bbatsov/ruby-style-guide#spaces-indentation',
-             '  Enabled: true',
-             '',
-             ''].join("\n"))
-        end
-
-        include_examples :prints_config
-      end
-
-      context 'with two cops given' do
-        let(:cop_list) { ['Style/Tab,Metrics/LineLength'] }
-        include_examples :prints_config
-      end
-
-      context 'with one of the cops misspelled' do
-        let(:cop_list) { ['Style/Tab,Lint/X123'] }
-
-        it 'skips the unknown cop' do
-          expect(stdout).to eq(
-            ['# Supports --auto-correct',
-             'Style/Tab:',
-             '  Description: No hard tabs.',
-             '  StyleGuide: ' \
-             'https://github.com/bbatsov/ruby-style-guide#spaces-indentation',
-             '  Enabled: true',
-             '',
-             ''].join("\n"))
-        end
-      end
-    end
-
-    describe '-f/--format' do
-      let(:target_file) { 'example.rb' }
-
-      before do
-        create_file(target_file, ['# encoding: utf-8',
-                                  '#' * 90])
-      end
-
-      describe 'builtin formatters' do
-        context 'when simple format is specified' do
-          it 'outputs with simple format' do
-            cli.run(['--format', 'simple', 'example.rb'])
-            expect($stdout.string)
-              .to include(["== #{target_file} ==",
-                           'C:  2: 81: Line is too long. [90/80]'].join("\n"))
-          end
-        end
-
-        context 'when clang format is specified' do
-          it 'outputs with clang format' do
-            create_file('example1.rb', ['# encoding: utf-8',
-                                        'x= 0 ',
-                                        '#' * 85,
-                                        'y ',
-                                        'puts x'])
-            create_file('example2.rb', ['# encoding: utf-8',
-                                        "\tx",
-                                        'def a',
-                                        '   puts',
-                                        'end'])
-            create_file('example3.rb', ['# encoding: utf-8',
-                                        'def badName',
-                                        '  if something',
-                                        '    test',
-                                        '    end',
-                                        'end'])
-            expect(cli.run(['--format', 'clang', 'example1.rb',
-                            'example2.rb', 'example3.rb']))
-              .to eq(1)
-            expect($stdout.string)
-              .to eq(['example1.rb:2:2: C: Surrounding space missing for ' \
-                      "operator '='.",
-                      'x= 0 ',
-                      ' ^',
-                      'example1.rb:2:5: C: Trailing whitespace detected.',
-                      'x= 0 ',
-                      '    ^',
-                      'example1.rb:3:81: C: Line is too long. [85/80]',
-                      '###################################################' \
-                      '##################################',
-                      '                                                   ' \
-                      '                             ^^^^^',
-                      'example1.rb:4:2: C: Trailing whitespace detected.',
-                      'y ',
-                      ' ^',
-                      'example2.rb:1:1: C: Incorrect indentation detected' \
-                      ' (column 0 instead of 1).',
-                      '# encoding: utf-8',
-                      '^^^^^^^^^^^^^^^^^',
-                      'example2.rb:2:1: C: Tab detected.',
-                      "\tx",
-                      '^',
-                      'example2.rb:3:1: C: Inconsistent indentation ' \
-                      'detected.',
-                      'def a',
-                      '^^^^^',
-                      'example2.rb:4:1: C: Use 2 (not 3) spaces for ' \
-                      'indentation.',
-                      '   puts',
-                      '^^^',
-                      'example3.rb:2:5: C: Use snake_case for method names.',
-                      'def badName',
-                      '    ^^^^^^^',
-                      'example3.rb:3:3: C: Use a guard clause instead of ' \
-                      'wrapping the code inside a conditional expression.',
-                      '  if something',
-                      '  ^^',
-                      'example3.rb:3:3: C: Favor modifier if usage ' \
-                      'when having a single-line body. Another good ' \
-                      'alternative is the usage of control flow &&/||.',
-                      '  if something',
-                      '  ^^',
-                      'example3.rb:5:5: W: end at 5, 4 is not aligned ' \
-                      'with if at 3, 2',
-                      '    end',
-                      '    ^^^',
-                      '',
-                      '3 files inspected, 12 offenses detected',
-                      ''].join("\n"))
-          end
-        end
-
-        context 'when emacs format is specified' do
-          it 'outputs with emacs format' do
-            create_file('example1.rb', ['# encoding: utf-8',
-                                        'x= 0 ',
-                                        'y ',
-                                        'puts x'])
-            create_file('example2.rb', ['# encoding: utf-8',
-                                        "\tx = 0",
-                                        'puts x'])
-            expect(cli.run(['--format', 'emacs', 'example1.rb',
-                            'example2.rb'])).to eq(1)
-            expected_output =
-              ["#{abs('example1.rb')}:2:2: C: Surrounding space missing" \
-               " for operator '='.",
-               "#{abs('example1.rb')}:2:5: C: Trailing whitespace detected.",
-               "#{abs('example1.rb')}:3:2: C: Trailing whitespace detected.",
-               "#{abs('example2.rb')}:1:1: C: Incorrect indentation detected" \
-               ' (column 0 instead of 1).',
-               "#{abs('example2.rb')}:2:1: C: Tab detected.",
-               "#{abs('example2.rb')}:3:1: C: Inconsistent indentation " \
-               'detected.',
-               ''].join("\n")
-            expect($stdout.string).to eq(expected_output)
-          end
-        end
-
-        context 'when unknown format name is specified' do
-          it 'aborts with error message' do
-            expect { cli.run(['--format', 'unknown', 'example.rb']) }
-              .to exit_with_code(1)
-            expect($stderr.string)
-              .to include('No formatter for "unknown"')
-          end
-        end
-      end
-
-      describe 'custom formatter' do
-        let(:target_file) { abs('example.rb') }
-
-        context 'when a class name is specified' do
-          it 'uses the class as a formatter' do
-            module MyTool
-              class RuboCopFormatter < RuboCop::Formatter::BaseFormatter
-                def started(all_files)
-                  output.puts "started: #{all_files.join(',')}"
-                end
-
-                def file_started(file, _options)
-                  output.puts "file_started: #{file}"
-                end
-
-                def file_finished(file, _offenses)
-                  output.puts "file_finished: #{file}"
-                end
-
-                def finished(processed_files)
-                  output.puts "finished: #{processed_files.join(',')}"
-                end
-              end
-            end
-
-            cli.run(['--format', 'MyTool::RuboCopFormatter', 'example.rb'])
-            expect($stdout.string).to eq(["started: #{target_file}",
-                                          "file_started: #{target_file}",
-                                          "file_finished: #{target_file}",
-                                          "finished: #{target_file}",
-                                          ''].join("\n"))
-          end
-        end
-
-        context 'when unknown class name is specified' do
-          it 'aborts with error message' do
-            args = '--format UnknownFormatter example.rb'
-            expect { cli.run(args.split) }.to exit_with_code(1)
-            expect($stderr.string).to include('UnknownFormatter')
-          end
-        end
-      end
-
-      it 'can be used multiple times' do
-        cli.run(['--format', 'simple', '--format', 'emacs', 'example.rb'])
-        expect($stdout.string)
-          .to include(["== #{target_file} ==",
-                       'C:  2: 81: Line is too long. [90/80]',
-                       "#{abs(target_file)}:2:81: C: Line is too long. " \
-                       '[90/80]'].join("\n"))
-      end
-    end
-
-    describe '-o/--out option' do
-      let(:target_file) { 'example.rb' }
-
-      before do
-        create_file(target_file, ['# encoding: utf-8',
-                                  '#' * 90])
-      end
-
-      it 'redirects output to the specified file' do
-        cli.run(['--out', 'output.txt', target_file])
-        expect(File.read('output.txt')).to include('Line is too long.')
-      end
-
-      it 'is applied to the previously specified formatter' do
-        cli.run(['--format', 'simple',
-                 '--format', 'emacs', '--out', 'emacs_output.txt',
-                 target_file])
-
-        expect($stdout.string).to eq(["== #{target_file} ==",
-                                      'C:  2: 81: Line is too long. [90/80]',
-                                      '',
-                                      '1 file inspected, 1 offense detected',
-                                      ''].join("\n"))
-
-        expect(File.read('emacs_output.txt'))
-          .to eq(["#{abs(target_file)}:2:81: C: Line is too long. [90/80]",
-                  ''].join("\n"))
-      end
-    end
-
-    describe '--fail-level option' do
-      let(:target_file) { 'example.rb' }
-
-      before do
-        create_file(target_file, ['# encoding: utf-8',
-                                  '#' * 90])
-      end
-
-      it 'fails when option is less than the severity level' do
-        expect(cli.run(['--fail-level', 'convention', target_file])).to eq(1)
-      end
-
-      it 'succeed when option is greater than the severity level' do
-        expect(cli.run(['--fail-level', 'warning', target_file])).to eq(0)
-      end
-    end
-
-    describe '--force-exclusion' do
-      let(:target_file) { 'example.rb' }
-
-      before do
-        create_file(target_file, ['# encoding: utf-8',
-                                  '#' * 90])
-
-        create_file('.rubocop.yml', ['AllCops:',
-                                     '  Exclude:',
-                                     "    - #{target_file}"])
-
-      end
-
-      it 'excludes files specified in the configuration Exclude ' \
-         'even if they are explicitly passed as arguments' do
-        expect(cli.run(['--force-exclusion', target_file])).to eq(0)
-      end
-    end
   end
 
   context 'when interrupted' do
@@ -1450,6 +83,44 @@ describe RuboCop::CLI, :isolated_environment do
     end
   end
 
+  context 'when given a file/directory that is not under the current dir' do
+    shared_examples 'checks Rakefile' do
+      it 'checks a Rakefile but Style/FileName does not report' do
+        create_file('Rakefile', 'x = 1')
+        create_file('other/empty', '')
+        Dir.chdir('other') do
+          expect(cli.run(['--format', 'simple', checked_path])).to eq(1)
+        end
+        expect($stdout.string)
+          .to eq(["== #{abs('Rakefile')} ==",
+                  'W:  1:  1: Useless assignment to variable - x.',
+                  '',
+                  '1 file inspected, 1 offense detected',
+                  ''].join("\n"))
+      end
+    end
+
+    context 'and the directory is absolute' do
+      let(:checked_path) { abs('..') }
+      include_examples 'checks Rakefile'
+    end
+
+    context 'and the directory is relative' do
+      let(:checked_path) { '..' }
+      include_examples 'checks Rakefile'
+    end
+
+    context 'and the Rakefile path is absolute' do
+      let(:checked_path) { abs('../Rakefile') }
+      include_examples 'checks Rakefile'
+    end
+
+    context 'and the Rakefile path is relative' do
+      let(:checked_path) { '../Rakefile' }
+      include_examples 'checks Rakefile'
+    end
+  end
+
   it 'checks a given correct file and returns 0' do
     create_file('example.rb', ['# encoding: utf-8',
                                'x = 0',
@@ -1480,8 +151,9 @@ describe RuboCop::CLI, :isolated_environment do
                                'en'])
     expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
     expect($stdout.string)
-      .to eq(["#{abs('example.rb')}:4:1: E: unexpected " \
-              'token $end',
+      .to eq(["#{abs('example.rb')}:4:2: E: unexpected " \
+              'token $end (Using Ruby 2.0 parser; configure using ' \
+              '`TargetRubyVersion` parameter, under `AllCops`)',
               ''].join("\n"))
   end
 
@@ -1496,7 +168,7 @@ describe RuboCop::CLI, :isolated_environment do
               "if it's surely a splat operator, or add a whitespace to the " \
               'right of the `*` if it should be a multiplication.',
               "#{abs('example.rb')}:3:1: C: " \
-              'Favor the ternary operator (?:) over if/then/else/end ' \
+              'Favor the ternary operator (`?:`) over `if/then/else/end` ' \
               'constructs.',
               ''].join("\n"))
   end
@@ -1552,6 +224,26 @@ describe RuboCop::CLI, :isolated_environment do
                 ''].join("\n"))
     end
 
+    context 'when --auto-correct is given' do
+      it 'does not trigger UnneededDisable due to lines moving around' do
+        src = ['a = 1 # rubocop:disable Lint/UselessAssignment']
+        create_file('example.rb', src)
+        create_file('.rubocop.yml', ['Style/Encoding:',
+                                     '  Enabled: true'])
+        expect(cli.run(['--format', 'offenses', '-a', 'example.rb'])).to eq(0)
+        expect($stdout.string).to eq(['',
+                                      '1  Style/Encoding',
+                                      '--',
+                                      '1  Total',
+                                      '',
+                                      ''].join("\n"))
+        expect(IO.read('example.rb'))
+          .to eq(['# encoding: utf-8',
+                  'a = 1 # rubocop:disable Lint/UselessAssignment',
+                  ''].join("\n"))
+      end
+    end
+
     it 'can disable selected cops in a code section' do
       create_file('example.rb',
                   ['# encoding: utf-8',
@@ -1595,13 +287,12 @@ describe RuboCop::CLI, :isolated_environment do
                   ['# encoding: utf-8',
                    'a' * 90 + ' # rubocop:disable Metrics/LineLength',
                    '#' * 95,
-                   'y("123") # rubocop:disable Metrics/LineLength,' \
-                   'Style/StringLiterals'
+                   'y("123", 123456) # rubocop:disable Style/StringLiterals,' \
+                   'Style/NumericLiterals'
                   ])
       expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
       expect($stdout.string)
-        .to eq(
-               ["#{abs('example.rb')}:3:81: C: Line is too long. [95/80]",
+        .to eq(["#{abs('example.rb')}:3:81: C: Line is too long. [95/80]",
                 ''].join("\n"))
     end
 
@@ -1615,9 +306,57 @@ describe RuboCop::CLI, :isolated_environment do
                     ])
         expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
         expect($stdout.string)
-          .to eq(
-                 ["#{abs('example.rb')}:3:81: C: Line is too long. [95/80]",
+          .to eq(["#{abs('example.rb')}:3:81: C: Line is too long. [95/80]",
                   ''].join("\n"))
+      end
+    end
+
+    context 'when not necessary' do
+      it 'causes an offense to be reported' do
+        create_file('example.rb',
+                    ['# encoding: utf-8',
+                     '#' * 95,
+                     '# rubocop:disable all',
+                     'a' * 10 + ' # rubocop:disable LineLength,ClassLength',
+                     'y(123) # rubocop:disable all'])
+        expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
+        expect($stderr.string).to eq('')
+        expect($stdout.string)
+          .to eq(["#{abs('example.rb')}:2:81: C: Line is too long. [95/80]",
+                  "#{abs('example.rb')}:3:1: W: Unnecessary disabling of " \
+                  'all cops.',
+                  "#{abs('example.rb')}:4:12: W: Unnecessary disabling of " \
+                  '`Metrics/ClassLength`, `Metrics/LineLength`.',
+                  "#{abs('example.rb')}:5:8: W: Unnecessary disabling of " \
+                  'all cops.',
+                  ''].join("\n"))
+      end
+
+      context 'and there are no other offenses' do
+        it 'exits with error code' do
+          create_file('example.rb',
+                      ['# encoding: utf-8',
+                       'a' * 10 + ' # rubocop:disable LineLength'])
+          expect(cli.run(['example.rb'])).to eq(1)
+        end
+      end
+
+      context 'and UnneededDisable is disabled' do
+        it 'does not cause UnneededDisable offenses to be reported' do
+          create_file('example.rb',
+                      ['# encoding: utf-8',
+                       '#' * 95,
+                       '# rubocop:disable all',
+                       'a' * 10 + ' # rubocop:disable LineLength,ClassLength',
+                       'y(123) # rubocop:disable all'])
+          create_file('.rubocop.yml', ['UnneededDisable:',
+                                       '  Enabled: false'])
+          expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
+          expect($stderr.string).to eq('')
+          expect($stdout.string)
+            .to eq(["#{abs('example.rb')}:2:81: C: Line is too long. [95/80]",
+                    ''].join("\n"))
+        end
       end
     end
   end
@@ -1640,6 +379,126 @@ describe RuboCop::CLI, :isolated_environment do
       .to eq(['', '1 file inspected, no offenses detected', ''].join("\n"))
   end
 
+  describe 'style guide only usage' do
+    context 'via the cli option' do
+      describe '--only-guide-cops' do
+        it 'skips cops that have no link to a style guide' do
+          create_file('example.rb', 'fail')
+          create_file('.rubocop.yml', ['Metrics/LineLength:',
+                                       '  Enabled: true',
+                                       '  StyleGuide: ~',
+                                       '  Max: 2'])
+
+          expect(cli.run(['--format', 'simple', '--only-guide-cops',
+                          'example.rb'])).to eq(0)
+        end
+
+        it 'runs cops for rules that link to a style guide' do
+          create_file('example.rb', 'fail')
+          create_file('.rubocop.yml', ['Metrics/LineLength:',
+                                       '  Enabled: true',
+                                       '  StyleGuide: "http://an.example/url"',
+                                       '  Max: 2'])
+
+          expect(cli.run(['--format', 'simple', '--only-guide-cops',
+                          'example.rb'])).to eq(1)
+
+          expect($stdout.string)
+            .to eq(['== example.rb ==',
+                    'C:  1:  3: Line is too long. [4/2]',
+                    '',
+                    '1 file inspected, 1 offense detected',
+                    ''].join("\n"))
+        end
+
+        it 'overrides configuration of AllCops/StyleGuideCopsOnly' do
+          create_file('example.rb', 'fail')
+          create_file('.rubocop.yml', ['AllCops:',
+                                       '  StyleGuideCopsOnly: false',
+                                       'Metrics/LineLength:',
+                                       '  Enabled: true',
+                                       '  StyleGuide: ~',
+                                       '  Max: 2'])
+
+          expect(cli.run(['--format', 'simple', '--only-guide-cops',
+                          'example.rb'])).to eq(0)
+        end
+      end
+    end
+
+    context 'via the config' do
+      before do
+        create_file('example.rb', 'do_something or fail')
+        create_file('.rubocop.yml',
+                    ['AllCops:',
+                     "  StyleGuideCopsOnly: #{guide_cops_only}",
+                     "  DisabledByDefault: #{disabled_by_default}",
+                     'Metrics/LineLength:',
+                     '  Enabled: true',
+                     '  StyleGuide: ~',
+                     '  Max: 2'])
+      end
+
+      describe 'AllCops/StyleGuideCopsOnly' do
+        let(:disabled_by_default) { 'false' }
+
+        context 'when it is true' do
+          let(:guide_cops_only) { 'true' }
+
+          it 'skips cops that have no link to a style guide' do
+            expect(cli.run(['--format', 'offenses', 'example.rb'])).to eq(1)
+
+            expect($stdout.string.strip).to eq(['1  Style/AndOr',
+                                                '--',
+                                                '1  Total'].join("\n"))
+          end
+        end
+
+        context 'when it is false' do
+          let(:guide_cops_only) { 'false' }
+
+          it 'runs cops for rules regardless of any link to the style guide' do
+            expect(cli.run(['--format', 'offenses', 'example.rb'])).to eq(1)
+
+            expect($stdout.string.strip).to eq(['1  Metrics/LineLength',
+                                                '1  Style/AndOr',
+                                                '--',
+                                                '2  Total'].join("\n"))
+          end
+        end
+      end
+
+      describe 'AllCops/DisabledByDefault' do
+        let(:guide_cops_only) { 'false' }
+
+        context 'when it is true' do
+          let(:disabled_by_default) { 'true' }
+
+          it 'runs only the cop configured in .rubocop.yml' do
+            expect(cli.run(['--format', 'offenses', 'example.rb'])).to eq(1)
+
+            expect($stdout.string.strip).to eq(['1  Metrics/LineLength',
+                                                '--',
+                                                '1  Total'].join("\n"))
+          end
+        end
+
+        context 'when it is false' do
+          let(:disabled_by_default) { 'false' }
+
+          it 'runs all cops that are enabled in default configuration' do
+            expect(cli.run(['--format', 'offenses', 'example.rb'])).to eq(1)
+
+            expect($stdout.string.strip).to eq(['1  Metrics/LineLength',
+                                                '1  Style/AndOr',
+                                                '--',
+                                                '2  Total'].join("\n"))
+          end
+        end
+      end
+    end
+  end
+
   describe 'rails cops' do
     describe 'enabling/disabling' do
       it 'by default does not run rails cops' do
@@ -1657,19 +516,19 @@ describe RuboCop::CLI, :isolated_environment do
         expect($stdout.string).to include('Prefer self[:attr]')
       end
 
-      it 'with configation option true in one dir runs rails cops there' do
+      it 'with configuration option true in one dir runs rails cops there' do
         source = ['# encoding: utf-8',
                   'read_attribute(:test)']
         create_file('dir1/app/models/example1.rb', source)
-        create_file('dir1/.rubocop.yml', ['AllCops:',
-                                          '  RunRailsCops: true',
+        create_file('dir1/.rubocop.yml', ['Rails:',
+                                          '  Enabled: true',
                                           '',
                                           'Rails/ReadWriteAttribute:',
                                           '  Include:',
                                           '    - app/models/**/*.rb'])
         create_file('dir2/app/models/example2.rb', source)
-        create_file('dir2/.rubocop.yml', ['AllCops:',
-                                          '  RunRailsCops: false',
+        create_file('dir2/.rubocop.yml', ['Rails:',
+                                          '  Enabled: false',
                                           '',
                                           'Rails/ReadWriteAttribute:',
                                           '  Include:',
@@ -1684,18 +543,39 @@ describe RuboCop::CLI, :isolated_environment do
                   ''].join("\n"))
       end
 
-      it 'with configation option false but -R given runs rails cops' do
+      it 'with configuration option false but -R given runs rails cops' do
         create_file('app/models/example1.rb', ['# encoding: utf-8',
                                                'read_attribute(:test)'])
-        create_file('.rubocop.yml', ['AllCops:',
-                                     '  RunRailsCops: false'])
+        create_file('.rubocop.yml', ['Rails:',
+                                     '  Enabled: false'])
         expect(cli.run(['--format', 'simple', '-R', 'app/models/example1.rb']))
           .to eq(1)
         expect($stdout.string).to include('Prefer self[:attr]')
       end
+
+      context 'with obsolete RunRailsCops config option' do
+        it 'prints a warning' do
+          create_file('.rubocop.yml', ['AllCops:',
+                                       '  RunRailsCops: false'])
+          expect(cli.run([])).to eq(2)
+          expect($stderr.string).to include('obsolete parameter RunRailsCops ' \
+                                            '(for AllCops) found')
+        end
+      end
     end
 
     describe 'including/excluding' do
+      it 'honors Exclude settings in .rubocop_todo.yml one level up' do
+        create_file('lib/example.rb', ['# encoding: utf-8',
+                                       'puts %x(ls)'])
+        create_file('.rubocop.yml', 'inherit_from: .rubocop_todo.yml')
+        create_file('.rubocop_todo.yml', ['Style/CommandLiteral:',
+                                          '  Exclude:',
+                                          '    - lib/example.rb'])
+        Dir.chdir('lib') { expect(cli.run([])).to eq(0) }
+        expect($stdout.string).to include('no offenses detected')
+      end
+
       it 'includes some directories by default' do
         source = ['# encoding: utf-8',
                   'read_attribute(:test)',
@@ -1708,14 +588,10 @@ describe RuboCop::CLI, :isolated_environment do
         # The .rubocop.yml file inherits from default.yml where the Include
         # config parameter is set for the rails cops. The paths are interpreted
         # as relative to dir1 because .rubocop.yml is placed there.
-        create_file('dir1/.rubocop.yml', ['AllCops:',
-                                          '  RunRailsCops: true',
+        create_file('dir1/.rubocop.yml', ['Rails:',
+                                          '  Enabled: true',
                                           '',
                                           'Rails/ReadWriteAttribute:',
-                                          '  Exclude:',
-                                          '    - "**/example2.rb"',
-                                          '',
-                                          'Rails/DefaultScope:',
                                           '  Exclude:',
                                           '    - "**/example2.rb"'])
         # No .rubocop.yml file in dir2 means that the paths from default.yml
@@ -1728,10 +604,8 @@ describe RuboCop::CLI, :isolated_environment do
           .to eq(['== dir1/app/models/example1.rb ==',
                   'C:  2:  1: Prefer self[:attr] over read_attribute' \
                   '(:attr).',
-                  'C:  3: 15: default_scope expects a block as its sole' \
-                  ' argument.',
                   '',
-                  '4 files inspected, 2 offenses detected',
+                  '4 files inspected, 1 offense detected',
                   ''].join("\n"))
       end
     end
@@ -1759,10 +633,126 @@ describe RuboCop::CLI, :isolated_environment do
         .to eq(['', '4 files inspected, no offenses detected',
                 ''].join("\n"))
     end
-
   end
 
   describe 'configuration from file' do
+    context 'when configured for rails style indentation' do
+      it 'accepts rails style indentation' do
+        create_file('.rubocop.yml', ['Style/IndentationConsistency:',
+                                     '  EnforcedStyle: rails'])
+        create_file('example.rb', ['# encoding: utf-8',
+                                   '',
+                                   '# A feline creature',
+                                   'class Cat',
+                                   '  def meow',
+                                   "    puts('Meow!')",
+                                   '  end',
+                                   '',
+                                   '  protected',
+                                   '',
+                                   '    def can_we_be_friends?(another_cat)',
+                                   '      some_logic(another_cat)',
+                                   '    end',
+                                   '',
+                                   '  private',
+                                   '',
+                                   '    def meow_at_3am?',
+                                   '      rand < 0.8',
+                                   '    end',
+                                   'end'])
+        result = cli.run(%w(--format simple))
+        expect($stderr.string).to eq('')
+        expect(result).to eq(0)
+        expect($stdout.string)
+          .to eq(['', '1 file inspected, no offenses detected',
+                  ''].join("\n"))
+      end
+
+      %w(class module).each do |parent|
+        it "registers offense for normal indentation in #{parent}" do
+          create_file('.rubocop.yml', ['Style/IndentationConsistency:',
+                                       '  EnforcedStyle: rails'])
+          create_file('example.rb', ['# encoding: utf-8',
+                                     '',
+                                     '# A feline creature',
+                                     "#{parent} Cat",
+                                     '  def meow',
+                                     "    puts('Meow!')",
+                                     '  end',
+                                     '',
+                                     '  protected',
+                                     '',
+                                     '  def can_we_be_friends?(another_cat)',
+                                     '    some_logic(another_cat)',
+                                     '  end',
+                                     '',
+                                     '  private',
+                                     '',
+                                     '  def meow_at_3am?',
+                                     '    rand < 0.8',
+                                     '  end',
+                                     '',
+                                     '  def meow_at_4am?',
+                                     '    rand < 0.8',
+                                     '  end',
+                                     'end'])
+          result = cli.run(%w(--format simple))
+          expect($stderr.string).to eq('')
+          expect(result).to eq(1)
+          expect($stdout.string)
+            .to eq(['== example.rb ==',
+                    'C: 11:  3: Use 2 (not 0) spaces for rails indentation.',
+                    'C: 17:  3: Use 2 (not 0) spaces for rails indentation.',
+                    '',
+                    '1 file inspected, 2 offenses detected',
+                    ''].join("\n"))
+        end
+      end
+    end
+
+    context 'when obsolete MultiSpaceAllowedForOperators param is used' do
+      it 'displays a warning' do
+        create_file('.rubocop.yml', ['Style/SpaceAroundOperators:',
+                                     '  MultiSpaceAllowedForOperators:',
+                                     '    - "="'])
+        expect(cli.run([])).to eq(2)
+        expect($stderr.string).to include('obsolete parameter ' \
+                                          'MultiSpaceAllowedForOperators ' \
+                                          '(for Style/SpaceAroundOperators)' \
+                                          ' found')
+      end
+    end
+
+    context 'when MultilineMethodCallIndentation is used with aligned ' \
+            'style and IndentationWidth parameter' do
+      it 'fails with an error message' do
+        create_file('example.rb', 'puts 1')
+        create_file('.rubocop.yml', ['Style/MultilineMethodCallIndentation:',
+                                     '  EnforcedStyle: aligned',
+                                     '  IndentationWidth: 1'])
+        expect(cli.run(['example.rb'])).to eq(2)
+        expect($stderr.string.strip).to eq(
+          'Error: The `Style/MultilineMethodCallIndentation` cop only accepts' \
+          ' an `IndentationWidth` configuration parameter when ' \
+          '`EnforcedStyle` is `indented`.')
+      end
+    end
+
+    context 'when MultilineOperationIndentation is used with aligned ' \
+            'style and IndentationWidth parameter' do
+      it 'fails with an error message' do
+        create_file('example.rb', 'puts 1')
+        create_file('.rubocop.yml', ['Style/MultilineOperationIndentation:',
+                                     '  EnforcedStyle: aligned',
+                                     '  IndentationWidth: 1'])
+        expect(cli.run(['example.rb'])).to eq(2)
+        expect($stderr.string.strip).to eq(
+          'Error: The `Style/MultilineOperationIndentation` cop only accepts' \
+          ' an `IndentationWidth` configuration parameter when ' \
+          '`EnforcedStyle` is `indented`.')
+      end
+    end
+
     it 'allows the default configuration file as the -c argument' do
       create_file('example.rb', ['# encoding: utf-8',
                                  'x = 0',
@@ -1776,15 +766,84 @@ describe RuboCop::CLI, :isolated_environment do
                 ''].join("\n"))
     end
 
+    it 'displays cop names if DisplayCopNames is true' do
+      source = ['# encoding: utf-8',
+                'x = 0 ',
+                'puts x']
+      create_file('example1.rb', source)
+
+      # DisplayCopNames: false inherited from config/default.yml
+      create_file('.rubocop.yml', [])
+
+      create_file('dir/example2.rb', source)
+      create_file('dir/.rubocop.yml', ['AllCops:',
+                                       '  DisplayCopNames: true'])
+
+      expect(cli.run(%w(--format simple))).to eq(1)
+      expect($stdout.string)
+        .to eq(['== example1.rb ==',
+                'C:  2:  6: Trailing whitespace detected.',
+                '== dir/example2.rb ==',
+                'C:  2:  6: Style/TrailingWhitespace: Trailing whitespace' \
+                ' detected.',
+                '',
+                '2 files inspected, 2 offenses detected',
+                ''].join("\n"))
+    end
+
+    it 'displays style guide URLs if DisplayStyleGuide is true' do
+      source = ['# encoding: utf-8',
+                'x = 0 ',
+                'puts x']
+      create_file('example1.rb', source)
+
+      # DisplayCopNames: false inherited from config/default.yml
+      create_file('.rubocop.yml', [])
+
+      create_file('dir/example2.rb', source)
+      create_file('dir/.rubocop.yml', ['AllCops:',
+                                       '  DisplayStyleGuide: true'])
+
+      url = 'https://github.com/bbatsov/ruby-style-guide#no-trailing-whitespace'
+
+      expect(cli.run(%w(--format simple))).to eq(1)
+      expect($stdout.string)
+        .to eq(['== example1.rb ==',
+                'C:  2:  6: Trailing whitespace detected.',
+                '== dir/example2.rb ==',
+                'C:  2:  6: Trailing whitespace' \
+                " detected. (#{url})",
+                '',
+                '2 files inspected, 2 offenses detected',
+                ''].join("\n"))
+    end
+
+    it 'uses the DefaultFormatter if another formatter is not specified' do
+      source = ['# encoding: utf-8',
+                'x = 0 ',
+                'puts x']
+      create_file('example1.rb', source)
+      create_file('.rubocop.yml', ['AllCops:',
+                                   '  DefaultFormatter: offenses'])
+
+      expect(cli.run([])).to eq(1)
+      expect($stdout.string.strip)
+        .to eq(['1  Style/TrailingWhitespace',
+                '--',
+                '1  Total'].join("\n"))
+    end
+
     it 'finds included files' do
       create_file('file.rb', 'x=0') # Included by default
       create_file('example', 'x=0')
       create_file('regexp', 'x=0')
       create_file('.dot1/file.rb', 'x=0') # Hidden but explicitly included
       create_file('.dot2/file.rb', 'x=0') # Hidden, excluded by default
+      create_file('.dot3/file.rake', 'x=0') # Hidden, not included by wildcard
       create_file('.rubocop.yml', ['AllCops:',
                                    '  Include:',
                                    '    - example',
+                                   '    - "**/*.rake"',
                                    '    - !ruby/regexp /regexp$/',
                                    '    - .dot1/**/*'
                                   ])
@@ -1864,7 +923,7 @@ describe RuboCop::CLI, :isolated_environment do
                 ''].join("\n"))
     end
 
-    it 'matches included/excluded files corectly when . argument is given' do
+    it 'matches included/excluded files correctly when . argument is given' do
       create_file('example.rb', 'x = 0')
       create_file('special.dsl', ['# encoding: utf-8',
                                   'setup { "stuff" }'
@@ -1953,7 +1012,7 @@ describe RuboCop::CLI, :isolated_environment do
       expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(0)
     end
 
-    it 'cannot disable Syntax offenses with fatal/error severity' do
+    it 'cannot disable Syntax offenses' do
       create_file('example.rb', 'class Test')
       create_file('.rubocop.yml', ['Style/Encoding:',
                                    '  Enabled: false',
@@ -1961,8 +1020,10 @@ describe RuboCop::CLI, :isolated_environment do
                                    'Syntax:',
                                    '  Enabled: false'
                                   ])
-      expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(1)
-      expect($stdout.string).to include('unexpected token $end')
+      expect(cli.run(['--format', 'emacs', 'example.rb'])).to eq(2)
+      expect($stderr.string).to include(
+        'Error: configuration for Syntax cop found')
+      expect($stderr.string).to include('This cop cannot be configured.')
     end
 
     it 'can be configured to merge a parameter that is a hash' do
@@ -1980,8 +1041,8 @@ describe RuboCop::CLI, :isolated_environment do
       cli.run(['--format', 'simple', '-c', 'rubocop.yml', 'example1.rb'])
       expect($stdout.string)
         .to eq(['== example1.rb ==',
-                'C:  2:  6: %w-literals should be delimited by [ and ]',
-                'C:  3:  6: %q-literals should be delimited by ( and )',
+                'C:  2:  6: %w-literals should be delimited by [ and ].',
+                'C:  3:  6: %q-literals should be delimited by ( and ).',
                 'C:  3:  6: Use %q only for strings that contain both single ' \
                 'quotes and double quotes.',
                 '',
@@ -2084,8 +1145,7 @@ describe RuboCop::CLI, :isolated_environment do
                                                '  Max: 100'
                                               ])
       expect(cli.run(%w(--format simple example))).to eq(1)
-      expect($stdout.string).to eq(
-                                   ['== example/lib/example1.rb ==',
+      expect($stdout.string).to eq(['== example/lib/example1.rb ==',
                                     'C:  2: 81: Line is too long. [90/80]',
                                     '',
                                     '2 files inspected, 1 offense detected',
@@ -2249,6 +1309,21 @@ describe RuboCop::CLI, :isolated_environment do
                 ''].join("\n"))
     end
 
+    it 'prints an error message for an unrecognized EnforcedStyle' do
+      create_file('example/example1.rb', ['# encoding: utf-8',
+                                          'puts "hello"'])
+      create_file('example/.rubocop.yml', ['Style/BracesAroundHashParameters:',
+                                           '  EnforcedStyle: context'])
+
+      expect(cli.run(%w(--format simple example))).to eq(2)
+      expect($stderr.string)
+        .to eq(["Error: invalid EnforcedStyle 'context' for " \
+                'Style/BracesAroundHashParameters found in ' +
+                abs('example/.rubocop.yml'),
+                'Valid choices are: braces, no_braces, context_dependent',
+                ''].join("\n"))
+    end
+
     it 'works when a configuration file passed by -c specifies Exclude ' \
        'with regexp' do
       create_file('example/example1.rb', ['# encoding: utf-8',
@@ -2311,6 +1386,18 @@ describe RuboCop::CLI, :isolated_environment do
                 ''].join("\n"))
     end
 
+    it 'fails when a configuration file has invalid YAML syntax' do
+      create_file('example/.rubocop.yml', ['AllCops:',
+                                           '  Exclude:',
+                                           '    - **/*_old.rb'])
+
+      cli.run(['example'])
+      # MRI and JRuby return slightly different error messages.
+      expect($stderr.string)
+        .to match(/^\(<unknown>\):\ (did\ not\ find\ )?expected\ alphabetic\ or
+                  \ numeric\ character/x)
+    end
+
     context 'when a file inherits from the old auto generated file' do
       before do
         create_file('rubocop-todo.yml', '')
@@ -2322,12 +1409,113 @@ describe RuboCop::CLI, :isolated_environment do
       end
 
       it 'prints a warning when --auto-gen-config is set' do
-        expect { cli.run(%w(-c .rubocop.yml --auto-gen-config)) }
-          .to exit_with_code(1)
+        expect(cli.run(%w(-c .rubocop.yml --auto-gen-config))).to eq(2)
         expect($stderr.string)
-          .to eq(['Attention: rubocop-todo.yml has been renamed to ' \
-                  '.rubocop_todo.yml',
+          .to eq(['Error: rubocop-todo.yml is obsolete; it must be called ' \
+                  '.rubocop_todo.yml instead',
                   ''].join("\n"))
+      end
+    end
+
+    context 'when a file inherits from a higher level' do
+      before do
+        create_file('.rubocop.yml', ['Metrics/LineLength:',
+                                     '  Exclude:',
+                                     '    - dir/example.rb'])
+        create_file('dir/.rubocop.yml', 'inherit_from: ../.rubocop.yml')
+        create_file('dir/example.rb', '#' * 90)
+      end
+
+      it 'inherits relative excludes correctly' do
+        expect(cli.run([])).to eq(0)
+      end
+    end
+
+    context 'when configuration is taken from $HOME/.rubocop.yml' do
+      before do
+        create_file("#{Dir.home}/.rubocop.yml", ['Metrics/LineLength:',
+                                                 '  Exclude:',
+                                                 '    - dir/example.rb'])
+        create_file('dir/example.rb', '#' * 90)
+      end
+
+      it 'handles relative excludes correctly when run from project root' do
+        expect(cli.run([])).to eq(0)
+      end
+    end
+
+    it 'shows an error if the input file cannot be found' do
+      begin
+        cli.run(%w(/tmp/not_a_file))
+      rescue SystemExit => e
+        expect(e.status).to eq(1)
+        expect(e.message)
+          .to eq 'rubocop: No such file or directory -- /tmp/not_a_file'
+      end
+    end
+  end
+
+  describe 'configuration of target Ruby versions' do
+    context 'when configured with an unknown version' do
+      it 'fails with an error message' do
+        create_file('.rubocop.yml', ['AllCops:',
+                                     '  TargetRubyVersion: 2.4'])
+        expect(cli.run([])).to eq(2)
+        expect($stderr.string.strip).to match(
+          /\AError: Unknown Ruby version 2.4 found in `TargetRubyVersion`/)
+        expect($stderr.string.strip).to match(
+          /Known versions: 1.9, 2.0, 2.1, 2.2, 2.3/)
+      end
+    end
+
+    context 'when set to 1.9 and Style/OptionHash is enabled' do
+      it 'fails with an error message' do
+        create_file('example1.rb', "puts 'hello'")
+        create_file('.rubocop.yml', ['AllCops:',
+                                     '  TargetRubyVersion: 1.9',
+                                     'Style/OptionHash:',
+                                     '  Enabled: true'])
+        expect(cli.run(['example1.rb'])).to eq(2)
+        expect($stderr.string.strip).to eq(
+          ['Error: The `Style/OptionHash` cop is only compatible with Ruby ' \
+           '2.0 and up, but the target Ruby version for your project is 1.9.',
+           'Please disable this cop or adjust the `TargetRubyVersion` ' \
+           'parameter in your configuration.'].join("\n"))
+      end
+    end
+
+    context 'when set to 1.9 and Style/SymbolArray is using percent style' do
+      it 'fails with an error message' do
+        create_file('example1.rb', "puts 'hello'")
+        create_file('.rubocop.yml', ['AllCops:',
+                                     '  TargetRubyVersion: 1.9',
+                                     'Style/SymbolArray:',
+                                     '  EnforcedStyle: percent',
+                                     '  Enabled: true'])
+        expect(cli.run(['example1.rb'])).to eq(2)
+        expect($stderr.string.strip).to eq(
+          ['Error: The default `percent` style for the `Style/SymbolArray` ' \
+           'cop is only compatible with Ruby 2.0 and up, but the target Ruby' \
+           ' version for your project is 1.9.',
+           'Please either disable this cop, configure it to use `array` ' \
+           'style, or adjust the `TargetRubyVersion` parameter in your ' \
+           'configuration.'].join("\n"))
+      end
+    end
+  end
+
+  describe 'obsolete cops' do
+    context 'when configuration for TrailingComma is given' do
+      it 'fails with an error message' do
+        create_file('example1.rb', "puts 'hello'")
+        create_file('.rubocop.yml', ['Style/TrailingComma:',
+                                     '  Enabled: true'])
+        expect(cli.run(['example1.rb'])).to eq(2)
+        expect($stderr.string.strip).to eq(
+          ['Error: The `Style/TrailingComma` cop no longer exists. Please ' \
+           'use `Style/TrailingCommaInLiteral` and/or ' \
+           '`Style/TrailingCommaInArguments` instead.',
+           "(configuration found in #{abs('.rubocop.yml')})"].join("\n"))
       end
     end
   end

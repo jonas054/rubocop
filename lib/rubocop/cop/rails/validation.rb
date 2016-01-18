@@ -1,11 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
     module Rails
       # This cop checks for the use of old-style attribute validation macros.
       class Validation < Cop
-        MSG = 'Prefer the new style validations `%s` over `%s`.'
+        MSG = 'Prefer the new style validations `%s` over `%s`.'.freeze
 
         BLACKLIST = [:validates_acceptance_of,
                      :validates_confirmation_of,
@@ -16,7 +17,7 @@ module RuboCop
                      :validates_numericality_of,
                      :validates_presence_of,
                      :validates_size_of,
-                     :validates_uniqueness_of]
+                     :validates_uniqueness_of].freeze
 
         WHITELIST = [
           'validates :column, acceptance: value',
@@ -29,7 +30,7 @@ module RuboCop
           'validates :column, presence: value',
           'validates :column, size: value',
           'validates :column, uniqueness: value'
-        ]
+        ].freeze
 
         def on_send(node)
           receiver, method_name, *_args = *node

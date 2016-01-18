@@ -1,11 +1,12 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   # This module holds the RuboCop version information.
   module Version
-    STRING = '0.27.1'
+    STRING = '0.36.0'.freeze
 
-    MSG = '%s (using Parser %s, running on %s %s %s)'
+    MSG = '%s (using Parser %s, running on %s %s %s)'.freeze
 
     module_function
 

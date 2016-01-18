@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,7 @@ module RuboCop
       # Comment lines can optionally be ignored.
       # The maximum allowed length is configurable.
       class ClassLength < Cop
-        include CodeLength
+        include ClassishLength
 
         def on_class(node)
           check_code_length(node)
@@ -16,31 +17,7 @@ module RuboCop
         private
 
         def message(length, max_length)
-          format('Class definition is too long. [%d/%d]', length, max_length)
-        end
-
-        def code_length(node)
-          class_body_line_numbers = line_range(node).to_a[1...-1]
-
-          target_line_numbers = class_body_line_numbers -
-                                line_numbers_of_inner_classes(node)
-
-          target_line_numbers.reduce(0) do |length, line_number|
-            source_line = processed_source[line_number]
-            next length if irrelevant_line(source_line)
-            length + 1
-          end
-        end
-
-        def line_numbers_of_inner_classes(node)
-          line_numbers = Set.new
-
-          node.each_descendant(:class, :module) do |inner_node|
-            line_range = line_range(inner_node)
-            line_numbers.merge(line_range)
-          end
-
-          line_numbers.to_a
+          format('Class has too many lines. [%d/%d]', length, max_length)
         end
       end
     end

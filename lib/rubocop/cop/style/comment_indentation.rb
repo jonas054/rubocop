@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,7 +8,7 @@ module RuboCop
       class CommentIndentation < Cop
         include AutocorrectAlignment
 
-        MSG = 'Incorrect indentation detected (column %d instead of %d).'
+        MSG = 'Incorrect indentation detected (column %d instead of %d).'.freeze
 
         def investigate(processed_source)
           processed_source.comments.each { |comment| check(comment) }
@@ -51,14 +52,11 @@ module RuboCop
         end
 
         def less_indented?(line)
-          keyword = 'end\b'
-          bracket = '[}\]]'
-          line =~ /^\s*(#{keyword}|#{bracket})/
+          line =~ /^\s*(end\b|[\}\]])/
         end
 
         def two_alternatives?(line)
-          keyword = '(else|elsif|when|rescue|ensure)\b'
-          line =~ /^\s*#{keyword}/
+          line =~ /^\s*(else|elsif|when|rescue|ensure)\b/
         end
       end
     end

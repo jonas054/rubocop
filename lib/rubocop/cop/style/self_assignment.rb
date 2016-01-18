@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -13,10 +14,8 @@ module RuboCop
       #   # good
       #   x += 1
       class SelfAssignment < Cop
-        include AST::Sexp
-
-        MSG = 'Use self-assignment shorthand `%s=`.'
-        OPS = [:+, :-, :*, :**, :/, :|, :&]
+        MSG = 'Use self-assignment shorthand `%s=`.'.freeze
+        OPS = [:+, :-, :*, :**, :/, :|, :&].freeze
 
         def on_lvasgn(node)
           check(node, :lvar)
@@ -61,6 +60,33 @@ module RuboCop
 
           operator = rhs.loc.operator.source
           add_offense(node, :expression, format(MSG, operator))
+        end
+
+        def autocorrect(node)
+          _var_name, rhs = *node
+
+          if rhs.type == :send
+            autocorrect_send_node(node, rhs)
+          elsif [:and, :or].include?(rhs.type)
+            autocorrect_boolean_node(node, rhs)
+          end
+        end
+
+        def autocorrect_send_node(node, rhs)
+          _receiver, method_name, args = *rhs
+          apply_autocorrect(node, rhs, method_name.to_s, args)
+        end
+
+        def autocorrect_boolean_node(node, rhs)
+          _first_operand, second_operand = *rhs
+          apply_autocorrect(node, rhs, rhs.loc.operator.source, second_operand)
+        end
+
+        def apply_autocorrect(node, rhs, operator, new_rhs)
+          lambda do |corrector|
+            corrector.insert_before(node.loc.operator, operator)
+            corrector.replace(rhs.source_range, new_rhs.source)
+          end
         end
       end
     end

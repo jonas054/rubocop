@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -7,10 +8,6 @@ module RuboCop
     # adding offenses for the faulty string nodes, and with filtering out
     # nodes.
     module StringHelp
-      # Regex matches IF there is a ' or there is a \\ in the string that is
-      # not preceeded/followed by another \\ (e.g. "\\x34") but not "\\\\".
-      ESCAPED_CHAR_REGEXP = /(?<! \\) \\{2}* \\ (?! \\)/x
-
       def on_str(node)
         # Constants like __FILE__ are handled as strings,
         # but don't respond to begin.
@@ -26,6 +23,11 @@ module RuboCop
 
       def on_regexp(node)
         ignore_node(node)
+      end
+
+      def inside_interpolation?(node)
+        # A :begin node inside a :dstr node is an interpolation.
+        node.ancestors.drop_while { |a| !a.begin_type? }.any?(&:dstr_type?)
       end
     end
   end

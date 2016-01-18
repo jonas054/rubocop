@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Formatter
@@ -8,12 +9,15 @@ module RuboCop
     class EmacsStyleFormatter < BaseFormatter
       def file_finished(file, offenses)
         offenses.each do |o|
-          message = o.corrected? ? '[Corrected] ' : ''
-          message << o.message
+          message = if o.corrected?
+                      "[Corrected] #{o.message}"
+                    else
+                      o.message
+                    end
 
           output.printf("%s:%d:%d: %s: %s\n",
                         file, o.line, o.real_column, o.severity.code,
-                        message)
+                        message.tr("\n", ' '))
         end
       end
     end

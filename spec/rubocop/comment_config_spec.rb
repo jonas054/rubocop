@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -12,33 +13,43 @@ describe RuboCop::CommentConfig do
         '',
         '# rubocop:disable Metrics/MethodLength',
         'def some_method',
-        "  puts 'foo'",
+        "  puts 'foo'",                                      # 5
         'end',
         '# rubocop:enable Metrics/MethodLength',
         '',
         '# rubocop:disable all',
-        'some_method',
+        'some_method',                                       # 10
         '# rubocop:enable all',
         '',
         "code = 'This is evil.'",
         'eval(code) # rubocop:disable Lint/Eval',
-        "puts 'This is not evil.'",
+        "puts 'This is not evil.'",                          # 15
         '',
         'def some_method',
         "  puts 'Disabling indented single line' # rubocop:disable " \
         'Metrics/LineLength',
         'end',
-        '',
+        '',                                                  # 20
         'string = <<END',
         'This is a string not a real comment # rubocop:disable Style/Loop',
         'END',
         '',
-        'foo # rubocop:disable Style/MethodCallParentheses',
+        'foo # rubocop:disable Style/MethodCallParentheses', # 25
         '',
         '# rubocop:enable Lint/Void',
         '',
         '# rubocop:disable Style/For',
-        'foo'
+        'foo',                                               # 30
+        '',
+        'class One',
+        '  # rubocop:disable Style/ClassVars',
+        '  @@class_var = 1',
+        'end',                                               # 35
+        '',
+        'class Two',
+        '  # rubocop:disable Style/ClassVars',
+        '  @@class_var = 2',
+        'end'                                                # 40
       ]
     end
 
@@ -70,7 +81,7 @@ describe RuboCop::CommentConfig do
       expect(void_disabled_lines & expected_part).to be_empty
     end
 
-    it 'supports disabling single line with a direcive at end of line' do
+    it 'supports disabling single line with a directive at end of line' do
       eval_disabled_lines = disabled_lines_of_cop('Lint/Eval')
       expect(eval_disabled_lines).to include(14)
       expect(eval_disabled_lines).not_to include(15)
@@ -88,10 +99,15 @@ describe RuboCop::CommentConfig do
       expect(loop_disabled_lines).not_to include(22)
     end
 
-    it 'supports disabling all cops with keyword all' do
+    it 'supports disabling all cops except Lint/UnneededDisable with ' \
+       'keyword all' do
       expected_part = (9..10).to_a
 
-      RuboCop::Cop::Cop.all.each do |cop|
+      cops = RuboCop::Cop::Cop.all.reject do |klass|
+        klass == RuboCop::Cop::Lint::UnneededDisable
+      end
+
+      cops.each do |cop|
         disabled_lines = disabled_lines_of_cop(cop)
         expect(disabled_lines & expected_part).to eq(expected_part)
       end
@@ -100,6 +116,11 @@ describe RuboCop::CommentConfig do
     it 'does not confuse a cop name including "all" with all cops' do
       alias_disabled_lines = disabled_lines_of_cop('Alias')
       expect(alias_disabled_lines).not_to include(25)
+    end
+
+    it 'can handle double disable of one cop' do
+      expect(disabled_lines_of_cop('Style/ClassVars'))
+        .to eq([9, 10, 11] + (33..40).to_a)
     end
   end
 end

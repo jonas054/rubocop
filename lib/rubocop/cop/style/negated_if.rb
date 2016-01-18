@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -8,7 +9,7 @@ module RuboCop
       class NegatedIf < Cop
         include NegativeConditional
 
-        MSG = 'Favor `%s` over `%s` for negative conditions.'
+        MSG = 'Favor `%s` over `%s` for negative conditions.'.freeze
 
         def on_if(node)
           return unless node.loc.respond_to?(:keyword)
@@ -28,7 +29,7 @@ module RuboCop
         private
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
+          lambda do |corrector|
             condition, _body, _rest = *node
             # look inside parentheses around the condition
             condition = condition.children.first while condition.type == :begin
@@ -38,8 +39,7 @@ module RuboCop
               node.loc.keyword,
               node.loc.keyword.is?('if') ? 'unless' : 'if'
             )
-            corrector.replace(condition.loc.expression,
-                              pos_condition.loc.expression.source)
+            corrector.replace(condition.source_range, pos_condition.source)
           end
         end
       end

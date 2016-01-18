@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -6,21 +7,26 @@ module RuboCop
     module StringLiteralsHelp
       include StringHelp
 
-      def wrong_quotes?(node, style)
-        src = node.loc.expression.source
-        return false if src.start_with?('%') || src.start_with?('?')
+      def wrong_quotes?(node)
+        src = node.source
+        return false if src.start_with?('%', '?')
         if style == :single_quotes
-          src !~ /'/ && src !~ StringHelp::ESCAPED_CHAR_REGEXP
+          src !~ /'/ && !double_quotes_acceptable?(node.str_content)
         else
-          src !~ /" | \\/x
+          src !~ /" | \\ | \#/x
         end
       end
 
       def autocorrect(node)
-        @corrections << lambda do |corrector|
-          replacement = node.loc.begin.is?('"') ? "'" : '"'
-          corrector.replace(node.loc.begin, replacement)
-          corrector.replace(node.loc.end, replacement)
+        return if node.dstr_type?
+
+        lambda do |corrector|
+          str = node.str_content
+          if style == :single_quotes
+            corrector.replace(node.source_range, to_string_literal(str))
+          else
+            corrector.replace(node.source_range, str.inspect)
+          end
         end
       end
     end

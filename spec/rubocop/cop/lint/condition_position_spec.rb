@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 require 'spec_helper'
 
@@ -8,7 +9,7 @@ describe RuboCop::Cop::Lint::ConditionPosition do
   %w(if unless while until).each do |keyword|
     it 'registers an offense for condition on the next line' do
       inspect_source(cop,
-                     ["#{keyword}",
+                     [keyword,
                       'x == 10',
                       'end'
                      ])
@@ -45,7 +46,7 @@ describe RuboCop::Cop::Lint::ConditionPosition do
   end
 
   it 'handles ternary ops' do
-    inspect_source(cop, ['x ? a : b'])
+    inspect_source(cop, 'x ? a : b')
     expect(cop.offenses).to be_empty
   end
 end

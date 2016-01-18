@@ -1,4 +1,5 @@
 # encoding: utf-8
+# frozen_string_literal: true
 
 module RuboCop
   module Cop
@@ -16,17 +17,12 @@ module RuboCop
       #     work
       #   end
       class InfiniteLoop < Cop
-        MSG = 'Use `Kernel#loop` for infinite loops.'
-
-        TRUTHY_LITERALS = [:str, :dstr, :int, :float, :array,
-                           :hash, :regexp, :true]
-
-        FALSEY_LITERALS = [:nil, :false]
+        MSG = 'Use `Kernel#loop` for infinite loops.'.freeze
 
         def on_while(node)
           condition, = *node
 
-          return unless TRUTHY_LITERALS.include?(condition.type)
+          return unless condition.truthy_literal?
 
           add_offense(node, :keyword)
         end
@@ -34,20 +30,20 @@ module RuboCop
         def on_until(node)
           condition, = *node
 
-          return unless FALSEY_LITERALS.include?(condition.type)
+          return unless condition.falsey_literal?
 
           add_offense(node, :keyword)
         end
 
         def autocorrect(node)
-          @corrections << lambda do |corrector|
-            condition_node, = *node
-            start_range = node.loc.keyword.begin
-            end_range = if node.loc.begin
-                          node.loc.begin.end
-                        else
-                          condition_node.loc.expression.end
-                        end
+          condition_node, = *node
+          start_range = node.loc.keyword.begin
+          end_range = if node.loc.begin
+                        node.loc.begin.end
+                      else
+                        condition_node.source_range.end
+                      end
+          lambda do |corrector|
             corrector.replace(start_range.join(end_range), 'loop do')
           end
         end
