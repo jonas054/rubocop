@@ -43,6 +43,7 @@
 * [#2721](https://github.com/bbatsov/rubocop/issues/2721): Do not register an offense for constants wrapped in parentheses passed to `rescue` in `Style/RedundantParentheses`. ([@rrosenblum][])
 * [#2742](https://github.com/bbatsov/rubocop/issues/2742): Fix `Style/TrailingCommaInArguments` & `Style/TrailingCommaInLiteral` for inline single element arrays. ([@annih][])
 * [#2768](https://github.com/bbatsov/rubocop/issues/2768): Allow parentheses after keyword `not` in `Style/MethodCallParentheses`. ([@lumeet][])
+* [#2758](https://github.com/bbatsov/rubocop/issues/2758): Allow leading underscores in camel case variable names.([@mmcguinn][])
 
 ### Changes
 
@@ -1935,3 +1936,4 @@
 [@seikichi]: https://github.com/seikichi
 [@madwort]: https://github.com/madwort
 [@annih]: https://github.com/annih
+[@mmcguinn]: https://github.com/mmcguinn
