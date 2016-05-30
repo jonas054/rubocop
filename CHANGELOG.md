@@ -12,6 +12,7 @@
 
 ### Bug fixes
 
+* [#3170](https://github.com/bbatsov/rubocop/issues/3170): `Style/MutableConstant` does not infinite-loop when correcting an array with no brackets. ([@alexdowad][])
 * [#3150](https://github.com/bbatsov/rubocop/issues/3150): Fix auto-correct for Style/MultilineArrayBraceLayout. ([@jspanjers][])
 * [#3192](https://github.com/bbatsov/rubocop/pull/3192): Fix `Lint/UnusedBlockArgument`'s `IgnoreEmptyBlocks` parameter from being removed from configuration. ([@jfelchner][])
 * [#3114](https://github.com/bbatsov/rubocop/issues/3114): Fix alignment `end` when auto-correcting `Style/EmptyElse`. ([@rrosenblum][])
