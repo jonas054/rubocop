@@ -14,6 +14,7 @@
 
 ### Bug fixes
 
+* [#3553](https://github.com/bbatsov/rubocop/pull/3553): Make `Style/RedundantSelf` cop to not register an offence for `self.()`. ([@iGEL][])
 * [#3474](https://github.com/bbatsov/rubocop/issues/3474): Make the `Rails/TimeZone` only analyze functions which have "Time" in the receiver. ([@b-t-g][])
 * [#3607](https://github.com/bbatsov/rubocop/pull/3607): Fix `Style/RedundantReturn` cop for empty if body. ([@pocke][])
 * [#3291](https://github.com/bbatsov/rubocop/issues/3291): Improve detection of `raw` and `html_safe` methods in `Rails/OutputSafety`. ([@lumeet][])
@@ -2466,3 +2467,4 @@
 [@tiagocasanovapt]: https://github.com/tiagocasanovapt
 [@jessieay]: https://github.com/jessieay
 [@tessi]: https://github.com/tessi
+[@iGEL]: https://github.com/iGEL
