@@ -21,6 +21,10 @@
 * [#3644](https://github.com/bbatsov/rubocop/pull/3644): Fix generation incorrect documentation. ([@pocke][])
 * [#3645](https://github.com/bbatsov/rubocop/pull/3645): Fix bug with empty case when nodes in `Style/RedundantReturn`. ([@tiagocasanovapt][])
 
+### Changes
+
+* [#3601](https://github.com/bbatsov/rubocop/pull/3601): Change default args for `Style/SingleLineBlockParams`. This cop checks that `reduce` and `inject` use the variable names `a` and `e` for block arguments. These defaults are uncommunicative variable names and thus conflict with the ["Uncommunicative Variable Name" check in Reek](https://github.com/troessner/reek/blob/master/docs/Uncommunicative-Variable-Name.md). Default args changed to `acc` and `elem`.([@jessieay][])
+
 ## 0.44.1 (2016-10-13)
 
 ### Bug fixes
@@ -2450,3 +2454,4 @@
 [@sihu]: https://github.com/sihu
 [@swcraig]: https://github.com/swcraig
 [@tiagocasanovapt]: https://github.com/tiagocasanovapt
+[@jessieay]: https://github.com/jessieay
