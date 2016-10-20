@@ -23,6 +23,7 @@
 * [#3644](https://github.com/bbatsov/rubocop/pull/3644): Fix generation incorrect documentation. ([@pocke][])
 * [#3645](https://github.com/bbatsov/rubocop/pull/3645): Fix bug with empty case when nodes in `Style/RedundantReturn`. ([@tiagocasanovapt][])
 * [#3637](https://github.com/bbatsov/rubocop/issues/3637): Fix Style/NonNilCheck crashing for ternary condition. ([@tejasbubane][])
+* [#3652](https://github.com/bbatsov/rubocop/issues/3652): Avoid crash Rails/HttpPositionalArguments for lvar params when auto-correct. ([@pocke][])
 
 ### Changes
 
