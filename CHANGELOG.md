@@ -10,6 +10,7 @@
 * [#3570](https://github.com/bbatsov/rubocop/issues/3570): Add new `MultilineIfModifier` cop to avoid usage of if/unless-modifiers on multiline statements. ([@tessi][])
 * [#3646](https://github.com/bbatsov/rubocop/pull/3646): Add new `Lint/EmptyWhen` cop. ([@drenmi][])
 * [#3246](https://github.com/bbatsov/rubocop/issues/3246): Add list of all cops to the manual (generated automatically from a rake task). ([@sihu][])
+* [#3647](https://github.com/bbatsov/rubocop/issues/3647): Add `--force-default-config` option. ([@jawshooah][])
 
 ### Bug fixes
 
