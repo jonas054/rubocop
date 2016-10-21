@@ -27,6 +27,7 @@
 * [#3652](https://github.com/bbatsov/rubocop/issues/3652): Avoid crash Rails/HttpPositionalArguments for lvar params when auto-correct. ([@pocke][])
 * [#3654](https://github.com/bbatsov/rubocop/pull/3654): Add missing keywords for `Rails/HttpPositionalArguments`. ([@eitoball][])
 * Fix bug in `Style/SafeNavigation` where there is a check for an object in an elsif statement with a method call on that object in the branch. ([@rrosenblum][])
+* [#3660](https://github.com/bbatsov/rubocop/pull/3660): Fix false positive for Rails/SafeNavigation when without receiver. ([@pocke][])
 
 ### Changes
 
