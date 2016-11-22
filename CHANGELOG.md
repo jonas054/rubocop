@@ -12,6 +12,7 @@
 * New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config hash. ([@olliebennett][])
 * [#3451](https://github.com/bbatsov/rubocop/issues/3451): Add new `require_parentheses_when_complex` style to `Style/TernaryParentheses` cop. ([@swcraig][])
 * New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config. ([@olliebennett][])
+* [#3600](https://github.com/bbatsov/rubocop/issues/3600): Add new `Bundler/OrderedGems` cop. ([@tdeo][])
 
 ### Changes
 
@@ -2507,3 +2508,5 @@
 [@aesthetikx]: https://github.com/aesthetikx
 [@aroben]: https://github.com/aroben
 [@olliebennett]: https://github.com/olliebennett
+[@aesthetikx]: https://github.com/aesthetikx
+[@tdeo]: https://github.com/tdeo
