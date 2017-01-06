@@ -18,6 +18,7 @@
 * [#3825](https://github.com/bbatsov/rubocop/pull/3825): Add new `Rails/SkipsModelValidations` cop. ([@rahulcs][])
 * [#3737](https://github.com/bbatsov/rubocop/issues/3737): Add new `Style/MethodCallWithArgsParentheses` cop. ([@dominh][])
 * Renamed `MethodCallParentheses` to `MethodCallWithoutArgsParentheses`. ([@dominh][])
+* [#3854](https://github.com/bbatsov/rubocop/pull/3854): Add new `Rails/ReversibleMigration` cop. ([@sue445][])
 
 ### Changes
 
@@ -2577,4 +2578,5 @@
 [@vergenzt]: https://github.com/vergenzt
 [@rahulcs]: https://github.com/rahulcs
 [@dominh]: https://github.com/dominh
+[@sue445]: https://github.com/sue445
 [@zverok]: https://github.com/zverok
