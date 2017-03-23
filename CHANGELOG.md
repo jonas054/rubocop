@@ -154,6 +154,9 @@
 * New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config hash. ([@olliebennett][])
 * [#3451](https://github.com/bbatsov/rubocop/issues/3451): Add new `require_parentheses_when_complex` style to `Style/TernaryParentheses` cop. ([@swcraig][])
 * New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config. ([@olliebennett][])
+* New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config. ([@olliebennett][])
+* New cop `Rails/EnumUniqueness` checks for duplicate values defined in enum config hash. ([@olliebennett][])
+* [#3451](https://github.com/bbatsov/rubocop/issues/3451): Add new `require_parentheses_when_complex` style to `Style/TernaryParentheses` cop. ([@swcraig][])
 * [#3600](https://github.com/bbatsov/rubocop/issues/3600): Add new `Bundler/OrderedGems` cop. ([@tdeo][])
 * [#3479](https://github.com/bbatsov/rubocop/issues/3479): Add new configuration option `IgnoredPatterns` to `Metrics/LineLength`. ([@jonas054][])
 
@@ -171,6 +174,8 @@
 * [#3687](https://github.com/bbatsov/rubocop/issues/3687): Fix the fact that `Style/TernaryParentheses` cop claims to correct uncorrected offenses. ([@Ana06][])
 * Add `format` as an acceptable keyword argument for `Rails/HttpPositionalArguments`. ([@aesthetikx][])
 * [#3568](https://github.com/bbatsov/rubocop/issues/3568): Fix `--auto-gen-config` behavior for `Style/VariableNumber`. ([@jonas054][])
+* [#3568](https://github.com/bbatsov/rubocop/issues/3568): Fix `--auto-gen-config` behavior for `Style/VariableNumber`. ([@jonas054][])
+* Add `format` as an acceptable keyword argument for `Rails/HttpPositionalArguments`. ([@aesthetikx][])
 * [#3598](https://github.com/bbatsov/rubocop/issues/3598): In `Style/NumericPredicate`, don't report `x != 0` or `x.nonzero?` as the expressions have different values. ([@jonas054][])
 * [#3690](https://github.com/bbatsov/rubocop/issues/3690): Do not register an offense for multiline braces with content in `Style/SpaceInsideBlockBraces`. ([@rrosenblum][])
 * [#3746](https://github.com/bbatsov/rubocop/issues/3746): `Lint/NonLocalExitFromIterator` does not warn about `return` in a block which is passed to `Object#define_singleton_method`. ([@AlexWayfer][])
@@ -205,6 +210,9 @@
 * [#3637](https://github.com/bbatsov/rubocop/issues/3637): Fix Style/NonNilCheck crashing for ternary condition. ([@tejasbubane][])
 * [#3652](https://github.com/bbatsov/rubocop/issues/3652): Avoid crash Rails/HttpPositionalArguments for lvar params when auto-correct. ([@pocke][])
 * [#3654](https://github.com/bbatsov/rubocop/pull/3654): Add missing keywords for `Rails/HttpPositionalArguments`. ([@eitoball][])
+* [#3637](https://github.com/bbatsov/rubocop/issues/3637): Fix Style/NonNilCheck crashing for ternary condition. ([@tejasbubane][])
+* [#3654](https://github.com/bbatsov/rubocop/pull/3654): Add missing keywords for `Rails/HttpPositionalArguments`. ([@eitoball][])
+* [#3652](https://github.com/bbatsov/rubocop/issues/3652): Avoid crash Rails/HttpPositionalArguments for lvar params when auto-correct. ([@pocke][])
 * Fix bug in `Style/SafeNavigation` where there is a check for an object in an elsif statement with a method call on that object in the branch. ([@rrosenblum][])
 * [#3660](https://github.com/bbatsov/rubocop/pull/3660): Fix false positive for Rails/SafeNavigation when without receiver. ([@pocke][])
 * [#3650](https://github.com/bbatsov/rubocop/issues/3650): Fix `Style/VariableNumber` registering an offense for variables with double digit numbers. ([@rrosenblum][])
@@ -1103,6 +1111,8 @@
 
 * [#1719](https://github.com/bbatsov/rubocop/pull/1719): Display an error and abort the program if input file can't be found. ([@matugm][])
 * Adjust behavior of `TrailingComma` cop to account for multi-line hashes nested within method calls. ([@panthomakos][])
+* Adjust behavior of `TrailingComma` cop to account for multi-line hashes nested within method calls. ([@panthomakos][])
+* [#1719](https://github.com/bbatsov/rubocop/pull/1719): Display an error and abort the program if input file can't be found. ([@matugm][])
 * New cop `SpaceInsideStringInterpolation` checks for spaces within string interpolations. ([@glasnt][])
 * New cop `NestedMethodDefinition` checks for method definitions inside other methods. ([@ojab][])
 * `LiteralInInterpolation` cop does auto-correction. ([@tmr08c][])
@@ -2538,6 +2548,8 @@
 [@RGBD]: https://github.com/RGBD
 [@matugm]: https://github.com/matugm
 [@panthomakos]: https://github.com/panthomakos
+[@panthomakos]: https://github.com/panthomakos
+[@matugm]: https://github.com/matugm
 [@m1foley]: https://github.com/m1foley
 [@tejasbubane]: https://github.com/tejasbubane
 [@bmorrall]: https://github.com/bmorrall
@@ -2656,6 +2668,12 @@
 [@ivanovaleksey]: https://github.com/ivanovaleksey
 [@Ana06]: https://github.com/Ana06
 [@aesthetikx]: https://github.com/aesthetikx
+[@jessieay]: https://github.com/jessieay
+[@tiagocasanovapt]: https://github.com/tiagocasanovapt
+[@iGEL]: https://github.com/iGEL
+[@tessi]: https://github.com/tessi
+[@ivanovaleksey]: https://github.com/ivanovaleksey
+[@Ana06]: https://github.com/Ana06
 [@aroben]: https://github.com/aroben
 [@olliebennett]: https://github.com/olliebennett
 [@aesthetikx]: https://github.com/aesthetikx
