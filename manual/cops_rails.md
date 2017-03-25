@@ -47,6 +47,58 @@ are not used.
 [1, 2, 'a'].prepend('b')
 ```
 
+## Rails/Blank
+
+Enabled by default | Supports autocorrection
+--- | ---
+Enabled | Yes
+
+This cops checks for code that can be changed to `blank?`.
+Settings:
+  NilOrEmpty: Convert checks for `nil` or `empty?` to `blank?`
+  NotPresent: Convert usages of not `present?` to `blank?`
+  UnlessPresent: Convert usages of `unless` `present?` to `blank?`
+
+### Example
+
+```ruby
+# NilOrEmpty: true
+  # bad
+  foo.nil? || foo.empty?
+  foo == nil || foo.empty?
+
+  # good
+  foo.blank?
+
+# NotPresent: true
+  # bad
+  !foo.present?
+
+  # good
+  foo.blank?
+
+# UnlessPresent: true
+  # bad
+  something unless foo.present?
+  unless foo.present?
+    something
+  end
+
+  # good
+  something if foo.blank?
+  if foo.blank?
+    something
+  end
+```
+
+### Important attributes
+
+Attribute | Value
+--- | ---
+NilOrEmpty | true
+NotPresent | true
+UnlessPresent | true
+
 ## Rails/Date
 
 Enabled by default | Supports autocorrection
@@ -471,6 +523,55 @@ core extensions to the numeric classes.
 3.days.ago
 1.month.ago
 ```
+
+## Rails/Present
+
+Enabled by default | Supports autocorrection
+--- | ---
+Enabled | Yes
+
+This cops checks for code that can be changed to `blank?`.
+Settings:
+  NotNilAndNotEmpty: Convert checks for not `nil` and `not empty?`
+                     to `present?`
+  NotBlank: Convert usages of not `blank?` to `present?`
+  UnlessBlank: Convert usages of `unless` `blank?` to `if` `present?`
+
+### Example
+
+```ruby
+# NotNilAndNotEmpty: true
+  # bad
+  !foo.nil? && !foo.empty?
+  foo != nil && !foo.empty?
+  !foo.blank?
+
+  # good
+  foo.present?
+
+# NotBlank: true
+  # bad
+  !foo.blank?
+  not foo.blank?
+
+  # good
+  foo.present?
+
+# UnlessBlank: true
+  # bad
+  something unless foo.blank?
+
+  # good
+  something if  foo.present?
+```
+
+### Important attributes
+
+Attribute | Value
+--- | ---
+NotNilAndNotEmpty | true
+NotBlank | true
+UnlessBlank | true
 
 ## Rails/ReadWriteAttribute
 

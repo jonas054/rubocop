@@ -177,6 +177,7 @@ In the following section you find all available cops:
 
 * [Rails/ActionFilter](cops_rails.md#railsactionfilter)
 * [Rails/ActiveSupportAliases](cops_rails.md#railsactivesupportaliases)
+* [Rails/Blank](cops_rails.md#railsblank)
 * [Rails/Date](cops_rails.md#railsdate)
 * [Rails/Delegate](cops_rails.md#railsdelegate)
 * [Rails/DelegateAllowBlank](cops_rails.md#railsdelegateallowblank)
@@ -192,6 +193,7 @@ In the following section you find all available cops:
 * [Rails/Output](cops_rails.md#railsoutput)
 * [Rails/OutputSafety](cops_rails.md#railsoutputsafety)
 * [Rails/PluralizationGrammar](cops_rails.md#railspluralizationgrammar)
+* [Rails/Present](cops_rails.md#railspresent)
 * [Rails/ReadWriteAttribute](cops_rails.md#railsreadwriteattribute)
 * [Rails/RelativeDateConstant](cops_rails.md#railsrelativedateconstant)
 * [Rails/RequestReferer](cops_rails.md#railsrequestreferer)

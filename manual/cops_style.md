@@ -2171,6 +2171,28 @@ if condition
 else
   do_y
 end
+
+# bad
+switch foo
+when 1
+  do_x
+when 2
+  do_x
+else
+  do_x
+end
+
+# good
+switch foo
+when 1
+  do_x
+  do_y
+when 2
+  # nothing
+else
+  do_x
+  do_z
+end
 ```
 
 ## Style/IfInsideElse
@@ -2498,15 +2520,49 @@ Enabled by default | Supports autocorrection
 --- | ---
 Enabled | Yes
 
-This cops checks for indentation that doesn't use two spaces.
+This cops checks for indentation that doesn't use the specified number
+of spaces.
+
+See also the IndentationConsistency cop which is the companion to this
+one.
 
 ### Example
 
 ```ruby
+# bad, Width: 2
 class A
  def test
   puts 'hello'
  end
+end
+
+# bad, Width: 2,
+       IgnoredPatterns:
+         - '^\s*module'
+module A
+class B
+  def test
+  puts 'hello'
+  end
+end
+end
+
+# good, Width: 2
+class A
+  def test
+    puts 'hello'
+  end
+end
+
+# good, Width: 2,
+        IgnoredPatterns:
+          - '^\s*module'
+module A
+class B
+  def test
+    puts 'hello'
+  end
+end
 end
 ```
 
@@ -2515,6 +2571,7 @@ end
 Attribute | Value
 --- | ---
 Width | 2
+IgnoredPatterns |
 
 ### References
 
@@ -3668,61 +3725,74 @@ Enabled | Yes
 Checks for uses of if with a negated condition. Only ifs
 without else are considered. There are three different styles:
 
-both - enforces `unless` for `prefix` and `postfix` conditionals
+  - both
+  - prefix
+  - postfix
 
-  # good
+### Example
 
-  unless foo
-    bar
-  end
+```ruby
+# EnforcedStyle: both
+# enforces `unless` for `prefix` and `postfix` conditionals
 
-  # bad
+# good
 
-  if !foo
-    bar
-  end
+unless foo
+  bar
+end
 
-  # good
+# bad
 
-  bar unless foo
+if !foo
+  bar
+end
 
-  # bad
+# good
 
-  bar if !foo
+bar unless foo
 
-prefix - enforces `unless` for just `prefix` conditionals
+# bad
 
-  # good
+bar if !foo
+```
+```ruby
+# EnforcedStyle: prefix
+# enforces `unless` for just `prefix` conditionals
 
-  unless foo
-    bar
-  end
+# good
 
-  # bad
+unless foo
+  bar
+end
 
-  if !foo
-    bar
-  end
+# bad
 
-  # good
+if !foo
+  bar
+end
 
-  bar if !foo
+# good
 
-postfix - enforces `unless` for just `postfix` conditionals
+bar if !foo
+```
+```ruby
+# EnforcedStyle: postfix
+# enforces `unless` for just `postfix` conditionals
 
-  # good
+# good
 
-  bar unless foo
+bar unless foo
 
-  # bad
+# bad
 
-  bar if !foo
+bar if !foo
 
-  # good
+# good
 
-  if !foo
-    bar
-  end
+if !foo
+  bar
+end
+```
 
 ### Important attributes
 

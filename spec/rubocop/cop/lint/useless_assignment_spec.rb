@@ -807,6 +807,105 @@ describe RuboCop::Cop::Lint::UselessAssignment do
     end
   end
 
+  context "when there's an unreferenced assignment in top level if branch " \
+          'while the variable is referenced in the paired else branch' do
+    let(:source) do
+      [
+        'if flag',
+        '  foo = 1',
+        'else',
+        '  puts foo',
+        'end'
+      ]
+    end
+
+    it 'registers an offense for the assignment in the if branch' do
+      inspect_source(cop, source)
+      expect(cop.offenses.size).to eq(1)
+      expect(cop.offenses.first.message)
+        .to eq('Useless assignment to variable - `foo`.')
+      expect(cop.offenses.first.line).to eq(2)
+      expect(cop.highlights).to eq(['foo'])
+    end
+  end
+
+  context "when there's an unreferenced reassignment in a if branch " \
+          'while the variable is referenced in the paired elsif branch' do
+    let(:source) do
+      [
+        'def some_method(flag_a, flag_b)',
+        '  foo = 1',
+        '',
+        '  if flag_a',
+        '    puts foo',
+        '    foo = 2',
+        '  elsif flag_b',
+        '    puts foo',
+        '  end',
+        'end'
+      ]
+    end
+
+    it 'registers an offense for the reassignment in the if branch' do
+      inspect_source(cop, source)
+      expect(cop.offenses.size).to eq(1)
+      expect(cop.offenses.first.message)
+        .to eq('Useless assignment to variable - `foo`.')
+      expect(cop.offenses.first.line).to eq(6)
+      expect(cop.highlights).to eq(['foo'])
+    end
+  end
+
+  context "when there's an unreferenced reassignment in a if branch " \
+          'while the variable is referenced in a case branch ' \
+          'in the paired else branch' do
+    let(:source) do
+      [
+        'def some_method(flag_a, flag_b)',
+        '  foo = 1',
+        '',
+        '  if flag_a',
+        '    puts foo',
+        '    foo = 2',
+        '  else',
+        '    case',
+        '    when flag_b',
+        '      puts foo',
+        '    end',
+        '  end',
+        'end'
+      ]
+    end
+
+    it 'registers an offense for the reassignment in the if branch' do
+      inspect_source(cop, source)
+      expect(cop.offenses.size).to eq(1)
+      expect(cop.offenses.first.message)
+        .to eq('Useless assignment to variable - `foo`.')
+      expect(cop.offenses.first.line).to eq(6)
+      expect(cop.highlights).to eq(['foo'])
+    end
+  end
+
+  context 'when an assignment in a if branch is referenced ' \
+          'in another if branch' do
+    let(:source) do
+      [
+        'def some_method(flag_a, flag_b)',
+        '  if flag_a',
+        '    foo = 1',
+        '  end',
+        '',
+        '  if flag_b',
+        '    puts foo',
+        '  end',
+        'end'
+      ]
+    end
+
+    include_examples 'accepts'
+  end
+
   context 'when a variable is assigned in branch of modifier if ' \
           'that references the variable in its conditional clause' \
           'and referenced after the branching' do
@@ -1748,6 +1847,25 @@ describe RuboCop::Cop::Lint::UselessAssignment do
     include_examples 'mimics MRI 2.1'
   end
 
+  # regression test, from problem in Locatable
+  context 'when a variable is assigned in 2 identical if branches' do
+    let(:source) do
+      ['def foo',
+       '  if bar',
+       '    foo = 1',
+       '  else',
+       '    foo = 1',
+       '  end',
+       '  foo.bar.baz',
+       'end']
+    end
+
+    it "doesn't think 1 of the 2 assignments is useless" do
+      inspect_source(cop, source)
+      expect(cop.offenses).to be_empty
+    end
+  end
+
   describe 'similar name suggestion' do
     context "when there's a similar variable-like method invocation" do
       let(:source) do
@@ -1867,25 +1985,6 @@ describe RuboCop::Cop::Lint::UselessAssignment do
         expect(cop.offenses.size).to eq(1)
         expect(cop.offenses.first.message)
           .to eq('Useless assignment to variable - `enviromnent`.')
-      end
-    end
-
-    # regression test, from problem in Locatable
-    context 'when a variable is assigned in 2 identical if branches' do
-      let(:source) do
-        ['def foo',
-         '  if bar',
-         '    foo = 1',
-         '  else',
-         '    foo = 1',
-         '  end',
-         '  foo.bar.baz',
-         'end']
-      end
-
-      it "doesn't think 1 of the 2 assignments is useless" do
-        inspect_source(cop, source)
-        expect(cop.offenses).to be_empty
       end
     end
   end

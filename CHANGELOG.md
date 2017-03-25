@@ -24,6 +24,9 @@
 * [#4038](https://github.com/bbatsov/rubocop/pull/4038): Allow `default` key in the `Style/PercentLiteralDelimiters` cop config to set all preferred delimiters. ([@kddeisz][])
 * Add `IgnoreMacros` option to `Style/MethodCallWithArgsParentheses`. ([@drenmi][])
 * [#3937](https://github.com/bbatsov/rubocop/issues/3937): Add new `Rails/ActiveSupportAliases` cop. ([@tdeo][])
+* Add new `Rails/Blank` cop. ([@rrosenblum][])
+* Add new `Rails/Present` cop. ([@rrosenblum][])
+* [#4004](https://github.com/bbatsov/rubocop/issues/4004): Allow not treating comment lines as group separators in `Bundler/OrderedGems` cop. ([@konto-andrzeja][])
 
 ### Changes
 
@@ -40,6 +43,7 @@
 * [#4081](https://github.com/bbatsov/rubocop/pull/4081): Allow `Marshal.load` if argument is a `Marshal.dump` in `Security/MarshalLoad` cop. ([@droptheplot][])
 * [#4124](https://github.com/bbatsov/rubocop/issues/4124): Make `Style/SymbolArray` cop to enable by default. ([@pocke][])
 * [#3331](https://github.com/bbatsov/rubocop/issues/3331): Change `Style/MultilineMethodCallIndentation` `indented_relative_to_receiver` to indent relative to the reciever and not relative to the caller. ([@jfelchner][])
+* [#4137](https://github.com/bbatsov/rubocop/pull/4137): Allow lines to be exempted from `IndentationWidth` by regex. ([@jfelchner][])
 
 ### Bug fixes
 
@@ -70,6 +74,9 @@
 * [#3580](https://github.com/bbatsov/rubocop/issues/3580): Handle combinations of `# rubocop:disable all` and `# rubocop:disable SomeCop`. ([@jonas054][])
 * [#4124](https://github.com/bbatsov/rubocop/issues/4124): Fix auto correction bugs in `Style/SymbolArray` cop. ([@pocke][])
 * [#4128](https://github.com/bbatsov/rubocop/issues/4128): Prevent `Style/CaseIndentation` cop from registering offenses on single-line case statements. ([@drenmi][])
+* [#4143](https://github.com/bbatsov/rubocop/issues/4143): Prevent `Style/IdenticalConditionalBranches` from registering offenses when a case statement has an empty when. ([@dpostorivo][])
+* [#4160](https://github.com/bbatsov/rubocop/pull/4160): Fix a regression where `UselessAssignment` cop may not properly detect useless assignments when there's only a single conditional expression in the top level scope. ([@yujinakayama][])
+* [#4162](https://github.com/bbatsov/rubocop/pull/4162): Fix a false negative in `UselessAssignment` cop with nested conditionals. ([@yujinakayama][])
 
 ## 0.47.1 (2017-01-18)
 
@@ -2710,3 +2717,5 @@
 [@andriymosin]: https://github.com/andriymosin
 [@brandonweiss]: https://github.com/brandonweiss
 [@betesh]: https://github.com/betesh
+[@dpostorivo]: https://github.com/dpostorivo
+[@konto-andrzeja]: https://github.com/konto-andrzeja
