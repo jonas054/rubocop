@@ -253,8 +253,7 @@ would suffice.
 'abc'.match(/bc\Z/)
 
 # good
-'abc' =~ /ab/
-'abc' =~ /\w*\Z/
+'abc'.end_with?('bc')
 ```
 
 ### Important attributes
@@ -418,7 +417,7 @@ Enabled by default | Supports autocorrection
 --- | ---
 Enabled | Yes
 
-This cop identifies use of `Regexp#match` or `String#match in a context
+This cop identifies use of `Regexp#match` or `String#match` in a context
 where the integral return value of `=~` would do just as well.
 
 ### Example
@@ -659,8 +658,7 @@ This cop identifies unnecessary use of a regex where
 'abc'.match(/\Aab/)
 
 # good
-'abc' =~ /ab/
-'abc' =~ /\A\w*/
+'abc'.start_with?('ab')
 ```
 
 ### Important attributes

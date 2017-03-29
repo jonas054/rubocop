@@ -6,8 +6,6 @@ module RuboCop
     # node when the builder constructs the AST, making its methods available
     # to all `send` nodes within RuboCop.
     class SendNode < Node
-      MACRO_PARENT_NODES = %i(class module).freeze
-
       # The receiving node of the method invocation.
       #
       # @return [Node, nil] the receiver of the invoked method or `nil`
@@ -24,7 +22,7 @@ module RuboCop
 
       # Checks whether the method name matches the argument.
       #
-      # @param [Symbol|String] name the method name to check for
+      # @param [Symbol, String] name the method name to check for
       # @return [Boolean] whether the method name matches the argument
       def method?(name)
         method_name == name.to_sym
@@ -38,13 +36,13 @@ module RuboCop
       #
       # @return [Boolean] whether the method is a macro method
       def macro?
-        !receiver && MACRO_PARENT_NODES.include?(parent && parent.type)
+        !receiver && macro_scope?
       end
 
       # Checks whether the method name matches the argument and has an
       # implicit receiver.
       #
-      # @param [Symbol|String] name the method name to check for
+      # @param [Symbol, String] name the method name to check for
       # @return [Boolean] whether the method name matches the argument
       def command?(name)
         !receiver && method?(name)
@@ -185,6 +183,13 @@ module RuboCop
       def node_parts
         [*self]
       end
+
+      private # rubocop:disable Lint/UselessAccessModifier
+
+      def_matcher :macro_scope?, <<-PATTERN
+        {^({class module} ...)
+         ^^({class module} ... (begin ...))}
+      PATTERN
     end
   end
 end
