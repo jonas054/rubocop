@@ -2,12 +2,23 @@
 
 ## master (unreleased)
 
+### Changes
+
+* [#4219](https://github.com/bbatsov/rubocop/issues/4219): Add a link to style guide for `Style/IndentationConsistency` cop. ([@pocke][])
+* [#4168](https://github.com/bbatsov/rubocop/issues/4168): Removed `-n` option. ([@sadovnik][])
+
 ### Bug fixes
 
 * [#4171](https://github.com/bbatsov/rubocop/pull/4171): Prevent `Rails/Blank` from breaking when RHS of `or` is a naked falsiness check. ([@drenmi][])
 * [#4189](https://github.com/bbatsov/rubocop/pull/4189): Make `Lint/AmbiguousBlockAssociation` aware of lambdas passed as arguments. ([@drenmi][])
 * [#4179](https://github.com/bbatsov/rubocop/pull/4179): Prevent `Rails/Blank` from breaking when LHS of `or` is a naked falsiness check. ([@rrosenblum][])
 * [#4172](https://github.com/bbatsov/rubocop/pull/4172): Fix false positives in `Style/MixinGrouping` cop. ([@drenmi][])
+* [#4185](https://github.com/bbatsov/rubocop/pull/4185): Make `Lint/NestedMethodDefinition` aware of `#*_exec` class of methods. ([@drenmi][])
+* [#4197](https://github.com/bbatsov/rubocop/pull/4197): Fix false positive in `Style/RedundantSelf` cop with parallel assignment. ([@drenmi][])
+* [#4199](https://github.com/bbatsov/rubocop/issues/4199): Fix incorrect auto correction in `Style/SymbolArray` and `Style/WordArray` cop. ([@pocke][])
+* [#4218](https://github.com/bbatsov/rubocop/pull/4218): Make `Lint/NestedMethodDefinition` aware of class shovel scope. ([@drenmi][])
+* [#4198](https://github.com/bbatsov/rubocop/pull/4198): Make `Lint/AmbguousBlockAssociation` aware of operator methods. ([@drenmi][])
+* [#4152](https://github.com/bbatsov/rubocop/pull/4152): Make `Style/MethodCallWithArgsParentheses` not require parens on setter methods. ([@drenmi][])
 
 ## 0.48.0 (2017-03-26)
 
@@ -2728,3 +2739,4 @@
 [@betesh]: https://github.com/betesh
 [@dpostorivo]: https://github.com/dpostorivo
 [@konto-andrzeja]: https://github.com/konto-andrzeja
+[@sadovnik]: https://github.com/sadovnik
