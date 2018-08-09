@@ -38,23 +38,70 @@ module RuboCop
     #       'Avoid chaining a method call on a do...end block.'
     #     )
     #
+    # Auto-correction can be tested using `with_correction` in conjunction with
+    # `expect_offense`. To set the correction, add a line containing `~~~`
+    # followed by the correction to the code snippet.
+    #
+    # @example `expect_offense` and `with_correction`
+    #
+    #   expect_offense(<<-RUBY.strip_indent).with_correction
+    #     x % 2 == 0
+    #     ^^^^^^^^^^ Replace with `Integer#even?`.
+    #     ~~~
+    #     x.even?
+    #   RUBY
+    #
     # If you do not want to specify an offense then use the
     # companion method `expect_no_offenses`. This method is a much
     # simpler assertion since it just inspects the source and checks
     # that there were no offenses. The `expect_offense` method has
     # to do more work by parsing out lines that contain carets.
     module ExpectOffense
+      # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
       def expect_offense(source, file = nil)
-        expected_annotations = AnnotatedSource.parse(source)
+        RuboCop::Formatter::DisabledConfigFormatter
+          .config_to_allow_offenses = {}
+        RuboCop::Formatter::DisabledConfigFormatter.detected_styles = {}
+        cop.instance_variable_get(:@options)[:auto_correct] = true
 
-        if expected_annotations.plain_source == source
-          raise 'Use expect_no_offenses to assert that no offenses are found'
+        @expected_annotations = AnnotatedSource.parse(source)
+
+        if @expected_annotations.plain_source == source
+          raise 'Use `expect_no_offenses` to assert that no offenses are found'
         end
 
-        inspect_source(expected_annotations.plain_source, file)
+        @processed_source = parse_source(@expected_annotations.plain_source,
+                                         file)
+
+        unless @processed_source.valid_syntax?
+          raise 'Error parsing example code'
+        end
+
+        _investigate(cop, @processed_source)
         actual_annotations =
-          expected_annotations.with_offense_annotations(cop.offenses)
-        expect(actual_annotations.to_s).to eq(expected_annotations.to_s)
+          @expected_annotations.with_offense_annotations(cop.offenses)
+
+        expect(actual_annotations.to_s).to eq(@expected_annotations.to_s)
+
+        self
+      end
+      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+
+      def with_correction
+        correction = @expected_annotations.correction
+        if correction.empty?
+          raise <<-MSG.strip_indent
+            Unable to find a correction to compare against.
+            Please make sure the source contains the line ~~~
+            to separate the source from the correction.
+          MSG
+        end
+
+        corrector =
+          RuboCop::Cop::Corrector.new(@processed_source.buffer, cop.corrections)
+        new_source = corrector.rewrite
+
+        expect(new_source).to eq(correction)
       end
 
       def expect_no_offenses(source, file = nil)
@@ -66,6 +113,7 @@ module RuboCop
       # Parsed representation of code annotated with the `^^^ Message` style
       class AnnotatedSource
         ANNOTATION_PATTERN = /\A\s*\^+ /.freeze
+        CORRECTION_SEPARATOR = /~~~\n/.freeze
 
         # @param annotated_source [String] string passed to the matchers
         #
@@ -77,7 +125,8 @@ module RuboCop
           source      = []
           annotations = []
 
-          annotated_source.each_line do |source_line|
+          source_area, correction = annotated_source.split(CORRECTION_SEPARATOR)
+          source_area.each_line do |source_line|
             if source_line =~ ANNOTATION_PATTERN
               annotations << [source.size, source_line]
             else
@@ -85,8 +134,10 @@ module RuboCop
             end
           end
 
-          new(source, annotations)
+          new(source, annotations, correction)
         end
+
+        attr_reader :correction
 
         # @param lines [Array<String>]
         # @param annotations [Array<(Integer, String)>]
@@ -94,9 +145,10 @@ module RuboCop
         #
         # @note annotations are sorted so that reconstructing the annotation
         #   text via {#to_s} is deterministic
-        def initialize(lines, annotations)
+        def initialize(lines, annotations, correction = '')
           @lines       = lines.freeze
           @annotations = annotations.sort.freeze
+          @correction  = correction.freeze
         end
 
         # Construct annotated source string (like what we parse)
