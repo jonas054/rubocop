@@ -63,6 +63,13 @@ module RuboCop
         expect(cop.offenses).to be_empty
       end
 
+      def expect_autocorrection(source, corrected_source)
+        expect_offense(source)
+        expected_annotations = AnnotatedSource.parse(source)
+        new_source = autocorrect_source(expected_annotations.plain_source)
+        expect(new_source).to eq(corrected_source)
+      end
+
       # Parsed representation of code annotated with the `^^^ Message` style
       class AnnotatedSource
         ANNOTATION_PATTERN = /\A\s*\^+ /

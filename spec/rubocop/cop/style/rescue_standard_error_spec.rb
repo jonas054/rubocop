@@ -52,33 +52,21 @@ RSpec.describe RuboCop::Cop::Style::RescueStandardError, :config do
       end
 
       context 'when rescuing StandardError by itself' do
-        it 'registers an offense' do
-          expect_offense(<<-RUBY.strip_indent)
-            begin
-              foo
-            rescue StandardError
-            ^^^^^^^^^^^^^^^^^^^^ Omit the error class when rescuing `StandardError` by itself.
-              bar
-            end
-          RUBY
-        end
-
         it 'autocorrect will remove StandardError' do
-          new_source = autocorrect_source(<<-RUBY.strip_indent)
-            begin
-              foo
-            rescue StandardError
-              bar
-            end
-          RUBY
-
-          expect(new_source).to eq(<<-RUBY.strip_indent)
-            begin
-              foo
-            rescue
-              bar
-            end
-          RUBY
+expect_autocorrection(<<-RUBY.strip_indent, <<-RUBY.strip_indent)
+  begin
+    foo
+  rescue StandardError
+  ^^^^^^^^^^^^^^^^^^^^ Omit the error class when rescuing `StandardError` by itself.
+    bar
+  end
+RUBY
+  begin
+    foo
+  rescue
+    bar
+  end
+RUBY
         end
 
         context 'when the error is assigned to a variable' do
