@@ -53,20 +53,21 @@ RSpec.describe RuboCop::Cop::Style::RescueStandardError, :config do
 
       context 'when rescuing StandardError by itself' do
         it 'autocorrect will remove StandardError' do
-expect_autocorrection(<<-RUBY.strip_indent, <<-RUBY.strip_indent)
-  begin
-    foo
-  rescue StandardError
-  ^^^^^^^^^^^^^^^^^^^^ Omit the error class when rescuing `StandardError` by itself.
-    bar
-  end
-RUBY
-  begin
-    foo
-  rescue
-    bar
-  end
-RUBY
+          expect_autocorrection(
+            <<-SOURCE_RUBY.strip_indent, <<-CORRECTED_RUBY.strip_indent)
+            begin
+              foo
+            rescue StandardError
+            ^^^^^^^^^^^^^^^^^^^^ Omit the error class when rescuing `StandardError` by itself.
+              bar
+            end
+          SOURCE_RUBY
+            begin
+              foo
+            rescue
+              bar
+            end
+          CORRECTED_RUBY
         end
 
         context 'when the error is assigned to a variable' do
