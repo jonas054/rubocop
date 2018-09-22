@@ -118,7 +118,6 @@ RSpec.describe RuboCop::Cop::Naming::PredicateName, :config do
     it 'does not register any offenses when using an internal affair macro' do
       expect_no_offenses(<<-RUBY.strip_indent)
         def_node_matcher :is_hello, <<-PATTERN
-                         ^^^^^^^^^ Rename `is_hello` to `hello?`.
           (send
             (send nil? :method_name) :==
             (str 'hello'))

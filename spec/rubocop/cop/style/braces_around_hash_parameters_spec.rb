@@ -18,7 +18,7 @@ RSpec.describe RuboCop::Cop::Style::BracesAroundHashParameters, :config do
 
     it 'accepts one empty hash parameter with whitespace' do
       expect_no_offenses(['where(  {     ',
-                          " }\t   )  "])
+                          " }\t   )  "].join("\n"))
     end
   end
 
