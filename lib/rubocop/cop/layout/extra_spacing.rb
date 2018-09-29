@@ -63,7 +63,7 @@ module RuboCop
 
         # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def check_assignment(token)
-          return if aligned_with_operator?(token)
+          return if aligned_with_assignment?(token)
 
           message = format(MSG_UNALIGNED_ASGN, location: 'preceding')
           add_offense(token.pos, location: token.pos, message: message)
