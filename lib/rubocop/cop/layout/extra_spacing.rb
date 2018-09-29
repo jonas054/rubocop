@@ -31,9 +31,7 @@ module RuboCop
         def investigate(processed_source)
           return if processed_source.blank?
 
-          if force_equal_sign_alignment?
-            @corrected = Set.new
-          end
+          @corrected = Set.new if force_equal_sign_alignment?
 
           processed_source.tokens.each_cons(2) do |token1, token2|
             check_tokens(processed_source.ast, token1, token2)
@@ -62,7 +60,6 @@ module RuboCop
           end
         end
 
-        # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
         def check_assignment(token)
           return if aligned_with_assignment?(token)
 
@@ -70,7 +67,6 @@ module RuboCop
                       location: token.pos,
                       message: MSG_UNALIGNED_ASGN)
         end
-        # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 
         def check_other(token1, token2, ast)
           extra_space_range(token1, token2) do |range|

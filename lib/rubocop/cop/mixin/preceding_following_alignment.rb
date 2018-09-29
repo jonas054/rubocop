@@ -19,14 +19,12 @@ module RuboCop
         aligned_with_adjacent_line?(range, method(:aligned_operator?))
       end
 
-      # rubocop:disable Metrics/MethodLength
       def aligned_with_assignment?(token)
         last_line = processed_source.lines.size
         aligned_with_assignment_in_direction?(token, token.line.downto(1)) &&
           aligned_with_assignment_in_direction?(token,
                                                 token.line.upto(last_line))
       end
-      # rubocop:enable Metrics/MethodLength
 
       def aligned_with_assignment_in_direction?(token, adjacent_line_range)
         token_line_indent             = processed_source
