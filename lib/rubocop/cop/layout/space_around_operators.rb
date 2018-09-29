@@ -140,16 +140,18 @@ module RuboCop
             'Space around operator `**` detected.' unless with_space.is?('**')
           elsif with_space.source !~ /^\s.*\s$/
             "Surrounding space missing for operator `#{operator.source}`."
-          elsif excess_leading_space?(type, operator, with_space) ||
-                excess_trailing_space?(right_operand, with_space)
+          elsif excess_leading_space?(type, operator, with_space.source) ||
+                excess_leading_space?(type, right_operand,
+                                      with_space.source[/ *$/])
             "Operator `#{operator.source}` should be surrounded " \
             'by a single space.'
           end
         end
 
         def excess_leading_space?(type, operator, with_space)
-          return false unless allow_for_alignment?
-          return false unless with_space.source =~ /^  /
+          return false if allow_for_alignment? &&
+                          aligned_with_something?(operator)
+          return false unless with_space =~ /^  /
 
           if type == :assignment
             token = Token.new(operator, nil, operator.source)

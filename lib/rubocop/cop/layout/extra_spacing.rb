@@ -24,8 +24,9 @@ module RuboCop
         include RangeHelp
 
         MSG_UNNECESSARY = 'Unnecessary spacing detected.'.freeze
-        MSG_UNALIGNED_ASGN = '`=` is not aligned with the %<location>s ' \
-                             'assignment.'.freeze
+        MSG_UNALIGNED_ASGN =
+          '`=` is not aligned with any assignment on adjacent' \
+          ' lines.'.freeze
 
         def investigate(processed_source)
           return if processed_source.blank?
@@ -65,8 +66,9 @@ module RuboCop
         def check_assignment(token)
           return if aligned_with_assignment?(token)
 
-          message = format(MSG_UNALIGNED_ASGN, location: 'preceding')
-          add_offense(token.pos, location: token.pos, message: message)
+          add_offense(token.pos,
+                      location: token.pos,
+                      message: MSG_UNALIGNED_ASGN)
         end
         # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
 

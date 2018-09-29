@@ -610,25 +610,18 @@ RSpec.describe RuboCop::Cop::Layout::SpaceAroundOperators do
         x +=  a
           ^^ Operator `+=` should be surrounded by a single space.
         a  + b
-           ^ Operator `+` should be surrounded by a single space.
         b  -  c
            ^ Operator `-` should be surrounded by a single space.
         c  * d
-           ^ Operator `*` should be surrounded by a single space.
         d  /  e
            ^ Operator `/` should be surrounded by a single space.
         e  % f
-           ^ Operator `%` should be surrounded by a single space.
         f  ^ g
-           ^ Operator `^` should be surrounded by a single space.
         g  | h
-           ^ Operator `|` should be surrounded by a single space.
         h  &  i
            ^ Operator `&` should be surrounded by a single space.
         i  ||  j
-           ^^ Operator `||` should be surrounded by a single space.
         y  -=  k   &&        l
-           ^^ Operator `-=` should be surrounded by a single space.
                    ^^ Operator `&&` should be surrounded by a single space.
       RUBY
     end
@@ -642,7 +635,7 @@ RSpec.describe RuboCop::Cop::Layout::SpaceAroundOperators do
       )
       expect(new_source).to eq(<<-RUBY.strip_indent)
         x += a + b - c * d / e % f ^ g | h & i || j
-        y -= k && l
+        y -= k   &&        l
       RUBY
     end
 
@@ -695,6 +688,87 @@ RSpec.describe RuboCop::Cop::Layout::SpaceAroundOperators do
           }
         RUBY
       end
+
+      it 'registers an offense for various assignments with too many spaces' do
+        expect_offense(<<-RUBY.strip_indent)
+          x ||=  0
+            ^^^ Operator `||=` should be surrounded by a single space.
+          y  &&=  0
+             ^^^ Operator `&&=` should be surrounded by a single space.
+          z  *=   2
+             ^^ Operator `*=` should be surrounded by a single space.
+          @a   = 0
+               ^ Operator `=` should be surrounded by a single space.
+          @@a   = 0
+                ^ Operator `=` should be surrounded by a single space.
+          a,b    =   0
+                 ^ Operator `=` should be surrounded by a single space.
+          A  = 0
+             ^ Operator `=` should be surrounded by a single space.
+          x[3]   = 0
+                 ^ Operator `=` should be surrounded by a single space.
+          $A    =   0
+                ^ Operator `=` should be surrounded by a single space.
+          A  ||=  0
+             ^^^ Operator `||=` should be surrounded by a single space.
+          A  +=    0
+             ^^ Operator `+=` should be surrounded by a single space.
+        RUBY
+      end
+
+      it 'auto-corrects missing space' do
+        new_source = autocorrect_source(
+          <<-RUBY.strip_indent
+            x +=  a  + b -  c  * d /  e  % f  ^ g   | h &  i  ||  j
+            y  -=  k   &&        l
+          RUBY
+        )
+        expect(new_source).to eq(<<-RUBY.strip_indent)
+          x += a + b - c * d / e % f ^ g | h & i || j
+          y -= k && l
+        RUBY
+      end
+
+      it 'registers an offense for operators with too many spaces' do
+        expect_offense(<<-RUBY.strip_indent)
+          x +=  a
+            ^^ Operator `+=` should be surrounded by a single space.
+          a  + b
+             ^ Operator `+` should be surrounded by a single space.
+          b  -  c
+             ^ Operator `-` should be surrounded by a single space.
+          c  * d
+             ^ Operator `*` should be surrounded by a single space.
+          d  /  e
+             ^ Operator `/` should be surrounded by a single space.
+          e  % f
+             ^ Operator `%` should be surrounded by a single space.
+          f  ^ g
+             ^ Operator `^` should be surrounded by a single space.
+          g  | h
+             ^ Operator `|` should be surrounded by a single space.
+          h  &  i
+             ^ Operator `&` should be surrounded by a single space.
+          i  ||  j
+             ^^ Operator `||` should be surrounded by a single space.
+          y  -=  k   &&        l
+             ^^ Operator `-=` should be surrounded by a single space.
+                     ^^ Operator `&&` should be surrounded by a single space.
+        RUBY
+      end
+
+      it 'auto-corrects assignment with too many spaces on either side' do
+        new_source = autocorrect_source(<<-RUBY.strip_indent)
+          x   = 0
+          y =   0
+          z  =   0
+        RUBY
+        expect(new_source).to eq(<<-RUBY.strip_indent)
+          x = 0
+          y = 0
+          z = 0
+        RUBY
+      end
     end
 
     it 'registers an offense for match operators with too many spaces' do
@@ -703,33 +777,6 @@ RSpec.describe RuboCop::Cop::Layout::SpaceAroundOperators do
            ^^ Operator `=~` should be surrounded by a single space.
         y !~   /abc/
           ^^ Operator `!~` should be surrounded by a single space.
-      RUBY
-    end
-
-    it 'registers an offense for various assignments with too many spaces' do
-      expect_offense(<<-RUBY.strip_indent)
-        x ||=  0
-          ^^^ Operator `||=` should be surrounded by a single space.
-        y  &&=  0
-           ^^^ Operator `&&=` should be surrounded by a single space.
-        z  *=   2
-           ^^ Operator `*=` should be surrounded by a single space.
-        @a   = 0
-             ^ Operator `=` should be surrounded by a single space.
-        @@a   = 0
-              ^ Operator `=` should be surrounded by a single space.
-        a,b    =   0
-               ^ Operator `=` should be surrounded by a single space.
-        A  = 0
-           ^ Operator `=` should be surrounded by a single space.
-        x[3]   = 0
-               ^ Operator `=` should be surrounded by a single space.
-        $A    =   0
-              ^ Operator `=` should be surrounded by a single space.
-        A  ||=  0
-           ^^^ Operator `||=` should be surrounded by a single space.
-        A  +=    0
-           ^^ Operator `+=` should be surrounded by a single space.
       RUBY
     end
 

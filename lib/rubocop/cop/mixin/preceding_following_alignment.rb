@@ -21,19 +21,24 @@ module RuboCop
 
       # rubocop:disable Metrics/MethodLength
       def aligned_with_assignment?(token)
-        token_line_indent              = processed_source
-                                         .line_indentation(token.line)
+        last_line = processed_source.lines.size
+        aligned_with_assignment_in_direction?(token, token.line.downto(1)) &&
+          aligned_with_assignment_in_direction?(token,
+                                                token.line.upto(last_line))
+      end
+      # rubocop:enable Metrics/MethodLength
 
-        preceding_line_range           = token.line.downto(1)
-        preceding_assignment_lines     = \
+      def aligned_with_assignment_in_direction?(token, preceding_line_range)
+        token_line_indent             = processed_source
+                                        .line_indentation(token.line)
+        preceding_assignment_lines     =
           relevant_assignment_lines(preceding_line_range)
         preceding_relevant_line_number = preceding_assignment_lines[1]
 
         return true unless preceding_relevant_line_number
 
-        preceding_relevant_indent = \
-          processed_source
-          .line_indentation(preceding_relevant_line_number)
+        preceding_relevant_indent =
+          processed_source.line_indentation(preceding_relevant_line_number)
 
         return true if preceding_relevant_indent < token_line_indent
 
@@ -41,11 +46,8 @@ module RuboCop
                           .lines[preceding_relevant_line_number - 1]
 
         return true unless assignment_line
-        return true if aligned_assignment?(token.pos, assignment_line)
-
-        false
+        aligned_assignment?(token.pos, assignment_line)
       end
-      # rubocop:enable Metrics/MethodLength
 
       def aligned_with_adjacent_line?(range, predicate)
         # minus 2 because node.loc.line is zero-based

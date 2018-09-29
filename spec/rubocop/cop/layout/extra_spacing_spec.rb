@@ -265,16 +265,14 @@ RSpec.describe RuboCop::Cop::Layout::ExtraSpacing, :config do
     end
 
     it 'registers an offense if consecutive assignments are not aligned' do
-      inspect_source(<<-RUBY.strip_indent)
+      expect_offense(<<-RUBY.strip_indent)
         a = 1
+          ^ `=` is not aligned with any assignment on adjacent lines.
         bb = 2
+           ^ `=` is not aligned with any assignment on adjacent lines.
         ccc = 3
+            ^ `=` is not aligned with any assignment on adjacent lines.
       RUBY
-      expect(cop.offenses.size).to eq(2)
-      expect(cop.messages).to eq(
-        ['`=` is not aligned with the preceding assignment.',
-         '`=` is not aligned with the preceding assignment.']
-      )
     end
 
     it 'does not register offenses for multiple complex nested assignments' do
