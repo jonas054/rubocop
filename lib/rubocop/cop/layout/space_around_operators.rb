@@ -123,7 +123,6 @@ module RuboCop
 
         def check_operator(type, operator, right_operand)
           with_space = range_with_surrounding_space(range: operator)
-          pp with_space.source
           return if with_space.source.start_with?("\n")
 
           offense(type, operator, with_space, right_operand) do |msg|

@@ -75,8 +75,6 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
     create_file('example.rb', source)
     expect(cli.run(['--auto-correct'])).to eq(1)
 
-    expect($stderr.string).to eql 'foo'
-
     expect(IO.read('example.rb')).to eq(<<-RUBY.strip_indent)
       def batch
         @areas   = params[:param].map do
