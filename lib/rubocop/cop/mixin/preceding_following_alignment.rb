@@ -28,22 +28,22 @@ module RuboCop
       end
       # rubocop:enable Metrics/MethodLength
 
-      def aligned_with_assignment_in_direction?(token, preceding_line_range)
+      def aligned_with_assignment_in_direction?(token, adjacent_line_range)
         token_line_indent             = processed_source
                                         .line_indentation(token.line)
-        preceding_assignment_lines     =
-          relevant_assignment_lines(preceding_line_range)
-        preceding_relevant_line_number = preceding_assignment_lines[1]
+        adjacent_assignment_lines     =
+          relevant_assignment_lines(adjacent_line_range)
+        adjacent_relevant_line_number = adjacent_assignment_lines[1]
 
-        return true unless preceding_relevant_line_number
+        return true unless adjacent_relevant_line_number
 
-        preceding_relevant_indent =
-          processed_source.line_indentation(preceding_relevant_line_number)
+        adjacent_relevant_indent =
+          processed_source.line_indentation(adjacent_relevant_line_number)
 
-        return true if preceding_relevant_indent < token_line_indent
+        return true if adjacent_relevant_indent < token_line_indent
 
         assignment_line = processed_source
-                          .lines[preceding_relevant_line_number - 1]
+                          .lines[adjacent_relevant_line_number - 1]
 
         return true unless assignment_line
         aligned_assignment?(token.pos, assignment_line)
