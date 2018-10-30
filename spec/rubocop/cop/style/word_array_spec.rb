@@ -114,13 +114,19 @@ RSpec.describe RuboCop::Cop::Style::WordArray, :config do
     end
 
     it 'registers an offense for an array with comments outside of it' do
-      expect_offense(<<-RUBY.strip_indent)
+      expect_offense(<<-RUBY.strip_indent).with_correction
         [
         ^ Use `%w` or `%W` for an array of words.
         "foo",
         "bar",
         "baz"
         ] # test
+        ~~~
+        %w(
+        foo
+        bar
+        baz
+        ) # test
       RUBY
     end
 
