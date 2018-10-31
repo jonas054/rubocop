@@ -12,6 +12,7 @@
 * [#6571](https://github.com/rubocop-hq/rubocop/issues/6571): Fix a false positive for `Layout/TrailingCommaInArguments` when a line break before a method call and `EnforcedStyleForMultiline` is set to `consistent_comma`. ([@koic][])
 * Do not attempt to auto-correct mass assignment or optional assignment in `Rails/RelativeDateConstant`. ([@rrosenblum][])
 * Fix auto-correction of `Style/WordArray` and `Style/SymbolArray` when all elements are on separate lines and there is a trailing comment after the closing bracket. ([@rrosenblum][])
+* Fix an exception that occurs when auto-correcting `Layout/ClosingParenthesesIndentation` when there are no arguments. ([@rrosenblum][])
 
 ## 0.61.1 (2018-12-06)
 

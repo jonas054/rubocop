@@ -274,10 +274,13 @@ RSpec.describe RuboCop::Cop::Layout::ClosingParenthesisIndentation do
       end
 
       it 'registers an offense for misaligned )' do
-        expect_offense(<<-RUBY.strip_indent)
+        expect_offense(<<-RUBY.strip_indent).with_correction
           foo = some_method(
             )
             ^ Indent `)` to column 0 (not 2)
+          ~~~
+          foo = some_method(
+          )
         RUBY
       end
     end
