@@ -6,24 +6,24 @@ RSpec.describe RuboCop::Cop::Bundler::InsecureProtocolSource do
   let(:config) { RuboCop::Config.new }
 
   it 'registers an offense when using `source :gemcutter`' do
-    expect_offense(<<-RUBY.strip_indent)
+    expect_offense do
       source :gemcutter
-             ^^^^^^^^^^ The source `:gemcutter` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
-    RUBY
+      #      ^^^^^^^^^^ The source `:gemcutter` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
+    end
   end
 
   it 'registers an offense when using `source :rubygems`' do
-    expect_offense(<<-RUBY.strip_indent)
+    expect_offense do
       source :rubygems
-             ^^^^^^^^^ The source `:rubygems` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
-    RUBY
+      #      ^^^^^^^^^ The source `:rubygems` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
+    end
   end
 
   it 'registers an offense when using `source :rubyforge`' do
-    expect_offense(<<-RUBY.strip_indent)
+    expect_offense do
       source :rubyforge
-             ^^^^^^^^^^ The source `:rubyforge` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
-    RUBY
+      #      ^^^^^^^^^^ The source `:rubyforge` is deprecated because HTTP requests are insecure. Please change your source to 'https://rubygems.org' if possible, or 'http://rubygems.org' if not.
+    end
   end
 
   it 'autocorrects `source :gemcutter`' do

@@ -155,6 +155,7 @@ module RuboCop
         end
 
         def all_disabled?(comment)
+          return false unless comment
           comment.text =~ /rubocop\s*:\s*disable\s+all\b/
         end
 
@@ -165,12 +166,14 @@ module RuboCop
         end
 
         def directive_count(comment)
+          return 1 unless comment
           match = comment.text.match(CommentConfig::COMMENT_DIRECTIVE_REGEXP)
           _, cops_string = match.captures
           cops_string.split(/,\s*/).size
         end
 
         def add_offenses(unneeded_cops)
+          p unneeded_cops: unneeded_cops
           unneeded_cops.each do |comment, cops|
             if all_disabled?(comment) ||
                directive_count(comment) == cops.size

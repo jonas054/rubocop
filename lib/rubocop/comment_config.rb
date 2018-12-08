@@ -58,6 +58,7 @@ module RuboCop
       analyses = Hash.new { |hash, key| hash[key] = CopAnalysis.new([], nil) }
 
       each_mentioned_cop do |cop_name, disabled, line, single_line|
+        p cop_name: cop_name, disabled: disabled, line: line, single_line: single_line
         analyses[cop_name] =
           analyze_cop(analyses[cop_name], disabled, line, single_line)
       end
@@ -117,6 +118,26 @@ module RuboCop
         cop_names.each do |cop_name|
           yield qualified_cop_name(cop_name), disabled, comment_line_number,
                 single_line
+        end
+      end
+
+      return if processed_source.buffer.name !~ %r(spec/rubocop/.*_spec.rb$)
+      each_expect_offense do |block_node, qualified_cop_name|
+        yield qualified_cop_name, true, block_node.loc.begin.line, false
+        yield qualified_cop_name, false, block_node.loc.end.line, false
+      end
+    end
+
+    def each_expect_offense
+      processed_source.ast.each_node do |n|
+        if n.send_type? && n.method_name == :expect_offense
+          n.each_ancestor do |a|
+            next if a.parent
+            raise "Unexpected type: #{a.type}" unless a.block_type?
+            qualified_cop_name =
+              a.send_node.arguments.first.source.split('::')[-2..-1].join('/')
+            yield n.parent, qualified_cop_name
+          end
         end
       end
     end

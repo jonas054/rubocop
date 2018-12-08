@@ -1,25 +1,27 @@
 # frozen_string_literal: true
 
+# rubocop:disable InternalAffairs/OffenseLocationKeyword
+
 RSpec.describe RuboCop::Cop::InternalAffairs::OffenseLocationKeyword do
   subject(:cop) { described_class.new }
 
   context 'when `node.loc.selector` is passed' do
     it 'registers an offense' do
-      expect_offense(<<-RUBY.strip_indent, 'example_cop.rb')
+      expect_offense do
         add_offense(node, location: node.loc.selector)
-                                    ^^^^^^^^^^^^^^^^^ Use `:selector` as the location argument to `#add_offense`.
-      RUBY
+        #                           ^^^^^^^^^^^^^^^^^ Use `:selector` as the location argument to `#add_offense`.
+      end
     end
 
     it 'registers an offense if message argument is passed' do
-      expect_offense(<<-RUBY.strip_indent, 'example_cop.rb')
+      expect_offense do
         add_offense(
           node,
           message: 'message',
           location: node.loc.selector
-                    ^^^^^^^^^^^^^^^^^ Use `:selector` as the location argument to `#add_offense`.
+          #         ^^^^^^^^^^^^^^^^^ Use `:selector` as the location argument to `#add_offense`.
         )
-      RUBY
+      end
     end
   end
 
@@ -61,3 +63,5 @@ RSpec.describe RuboCop::Cop::InternalAffairs::OffenseLocationKeyword do
     RUBY
   end
 end
+
+# rubocop:enable InternalAffairs/OffenseLocationKeyword

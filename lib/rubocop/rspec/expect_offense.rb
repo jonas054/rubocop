@@ -58,7 +58,9 @@ module RuboCop
     # to do more work by parsing out lines that contain carets.
     module ExpectOffense
       # rubocop:disable Metrics/AbcSize, Metrics/MethodLength
-      def expect_offense(source, file = nil)
+      def expect_offense(source = nil, file = nil, &block)
+        source = extract(block, 'expect_offense') if block_given?
+
         RuboCop::Formatter::DisabledConfigFormatter
           .config_to_allow_offenses = {}
         RuboCop::Formatter::DisabledConfigFormatter.detected_styles = {}
@@ -85,16 +87,13 @@ module RuboCop
 
         self
       end
-      # rubocop:enable Metrics/AbcSize, Metrics/MethodLength
+      # rubocop:enable Metrics/MethodLength
 
-      def with_correction
-        correction = @expected_annotations.correction
-        if correction.empty?
-          raise <<-MSG.strip_indent
-            Unable to find a correction to compare against.
-            Please make sure the source contains the line ~~~
-            to separate the source from the correction.
-          MSG
+      def expect_correction(correction = nil, &block)
+        correction = extract(block, 'expect_correction') if block_given?
+        correction += "\n" unless correction.end_with?("\n")
+        unless @processed_source
+          raise 'expect_correction should follow expect_offense'
         end
 
         corrector =
@@ -103,11 +102,31 @@ module RuboCop
 
         expect(new_source).to eq(correction)
       end
+      # rubocop:enable Metrics/AbcSize
 
-      def expect_no_offenses(source, file = nil)
+      def expect_no_offenses(source = nil, file = nil, &block)
+        source = extract(block, 'expect_no_offenses') if block_given?
+
         inspect_source(source, file)
 
         expect(cop.offenses).to be_empty
+      end
+
+      def extract(block, method_name)
+        src_file, line = block.source_location
+        test_src = File.read(src_file).lines[line - 1..-1].join
+        case test_src
+        when /\A( *)#{method_name}(\(.*)? do\n((.*\n)*?)\1end\b/
+          Regexp.last_match(3)
+            .gsub(/#( +\^)/, ' \1')
+            .gsub(/ \\\n *##+/m, '')
+                .gsub(/(##+)/) { |s| s.tr('#', '^') }
+                .strip_indent
+        when /#{method_name}(\(.*)? \{(.*)\}/
+          Regexp.last_match(2).strip
+        else
+          raise "Could not find #{method_name}"
+        end
       end
 
       # Parsed representation of code annotated with the `^^^ Message` style

@@ -1,44 +1,36 @@
 # frozen_string_literal: true
 
+# rubocop:disable InternalAffairs/RedundantLocationArgument
+
 RSpec.describe RuboCop::Cop::InternalAffairs::RedundantLocationArgument do
   subject(:cop) { described_class.new }
 
   context 'when location argument is passed' do
     context 'when location argument is :expression' do
       it 'registers an offense' do
-        expect_offense(<<-RUBY.strip_indent, 'example_cop.rb')
+        expect_offense do
           add_offense(node, location: :expression)
-                            ^^^^^^^^^^^^^^^^^^^^^ Redundant location argument to `#add_offense`.
-        RUBY
+          #                 ^^^^^^^^^^^^^^^^^^^^^ Redundant location argument to `#add_offense`.
+        end
+        expect_correction { add_offense(node) }
       end
 
       context 'when there is a message argument' do
         it 'registers an offense' do
-          expect_offense(<<-RUBY.strip_indent, 'example_cop.rb')
+          expect_offense do
             add_offense(node, location: :expression, message: 'message')
-                              ^^^^^^^^^^^^^^^^^^^^^ Redundant location argument to `#add_offense`.
-          RUBY
+            #                 ^^^^^^^^^^^^^^^^^^^^^ Redundant location argument to `#add_offense`.
+          end
+          expect_correction { add_offense(node, message: 'message') }
         end
       end
 
-      it 'removes default `location` when there are no other keywords' do
-        corrected = autocorrect_source(<<-RUBY.strip_indent)
-          add_offense(node, location: :expression)
-        RUBY
-
-        expect(corrected).to eq(<<-RUBY.strip_indent)
-          add_offense(node)
-        RUBY
-      end
-
       it 'removes default `location` when preceded by another keyword' do
-        corrected = autocorrect_source(<<-RUBY.strip_indent)
+        expect_offense do
           add_offense(node, message: 'foo', location: :expression)
-        RUBY
-
-        expect(corrected).to eq(<<-RUBY.strip_indent)
-          add_offense(node, message: 'foo')
-        RUBY
+          #                                 ^^^^^^^^^^^^^^^^^^^^^ Redundant location argument to `#add_offense`.
+        end
+        expect_correction { add_offense(node, message: 'foo') }
       end
 
       it 'removes default `location` when followed by another keyword' do
@@ -88,3 +80,5 @@ RSpec.describe RuboCop::Cop::InternalAffairs::RedundantLocationArgument do
     end
   end
 end
+
+# rubocop:enable InternalAffairs/RedundantLocationArgument

@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+# rubocop:disable Style/UnneededPercentQ, Style/BarePercentLiterals
+# rubocop:disable Style/PercentQLiterals
+
 RSpec.describe RuboCop::Cop::Style::PercentQLiterals, :config do
   subject(:cop) { described_class.new(config) }
 
@@ -38,11 +41,7 @@ RSpec.describe RuboCop::Cop::Style::PercentQLiterals, :config do
           %Q(hi)
           ^^^ Do not use `%Q` unless interpolation is needed. Use `%q`.
         RUBY
-      end
-
-      it 'auto-corrects' do
-        new_source = autocorrect_source('%Q(hi)')
-        expect(new_source).to eq('%q(hi)')
+        expect_correction { %q(hi) }
       end
 
       include_examples 'accepts quote characters'
@@ -72,15 +71,11 @@ RSpec.describe RuboCop::Cop::Style::PercentQLiterals, :config do
           %q(hi)
           ^^^ Use `%Q` instead of `%q`.
         RUBY
+        expect_correction { %Q(hi) }
       end
 
       it 'accepts %Q' do
         expect_no_offenses('%Q(hi)')
-      end
-
-      it 'auto-corrects' do
-        new_source = autocorrect_source('%q[hi]')
-        expect(new_source).to eq('%Q[hi]')
       end
 
       include_examples 'accepts quote characters'
@@ -109,3 +104,6 @@ RSpec.describe RuboCop::Cop::Style::PercentQLiterals, :config do
     end
   end
 end
+
+# rubocop:enable Style/UnneededPercentQ, Style/BarePercentLiterals
+# rubocop:enable Style/PercentQLiterals
