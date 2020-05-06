@@ -1,6 +1,7 @@
 # Common configuration.
 
 AllCops:
+  AllowedOffenses: ~
   RubyInterpreters:
     - ruby
     - macruby

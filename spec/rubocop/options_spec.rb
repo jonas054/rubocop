@@ -61,6 +61,9 @@ RSpec.describe RuboCop::Options, :isolated_environment do
                                                when running --auto-gen-config, except if the
                                                number of files with offenses is bigger than
                                                exclude-limit.
+                  --auto-gen-allowed-offenses  Generate an AllCops/AllowedOffenses parameter when
+                                               running --auto-gen-config and not Enabled, Max, or
+                                               Exclude.
                   --no-auto-gen-timestamp      Do not include the date and time when
                                                the --auto-gen-config was run in the file it
                                                generates.
@@ -321,6 +324,13 @@ RSpec.describe RuboCop::Options, :isolated_environment do
     describe '--auto-gen-only-exclude' do
       it 'fails if given without --auto-gen-config' do
         expect { options.parse %w[--auto-gen-only-exclude] }
+          .to raise_error(RuboCop::OptionArgumentError)
+      end
+    end
+
+    describe '--auto-gen-allowed-offenses' do
+      it 'fails if given without --auto-gen-config' do
+        expect { options.parse %w[--auto-gen-allowed-offenses] }
           .to raise_error(RuboCop::OptionArgumentError)
       end
     end

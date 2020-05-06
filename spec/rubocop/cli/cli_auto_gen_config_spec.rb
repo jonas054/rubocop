@@ -9,8 +9,8 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
 
   describe '--auto-gen-config' do
     before do
-      RuboCop::Formatter::DisabledConfigFormatter
-        .config_to_allow_offenses = {}
+      RuboCop::Formatter::DisabledConfigFormatter.config_to_allow_offenses = {}
+      RuboCop::Formatter::DisabledConfigFormatter.detected_styles = {}
     end
 
     shared_examples 'LineLength handling' do |ctx, initial_dotfile, exp_dotfile|
@@ -969,6 +969,7 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
 
       expect(cli.run(['--auto-gen-config', '--auto-gen-only-exclude',
                       '--exclude-limit', '1'])).to eq(0)
+      expect($stderr.string).to eq('')
       actual = IO.read('.rubocop_todo.yml').split($RS)
 
       # With --exclude-limit 1 we get MinDigits generated for NumericLiterals
@@ -991,6 +992,93 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
           Exclude:
             - 'example1.rb'
       YAML
+    end
+
+    it 'generates AllowedOffenses and EnforcedStyle and LineLength Max ' \
+       'instead of Enabled, Max, and Exclude when ' \
+       '--auto-gen-allowed-offenses is used' do
+      create_file('example1.rb', ['#' * 90,
+                                  '#' * 90,
+                                  'puts 123456'])
+      create_file('example2.rb', <<~RUBY)
+        def function
+          puts 123456
+          puts "a"
+        end
+      RUBY
+
+      expect(cli.run(['--auto-gen-config', '--auto-gen-allowed-offenses']))
+        .to eq(0)
+      expect($stderr.string).to eq('')
+      actual = IO.read('.rubocop_todo.yml').split($RS)
+
+      # AllowedOffenses is generated in most cases, but if a non-default style
+      # is used consistently, an EnforcedStyle parameter is generated instead.
+      expect(actual[7..-1].join($RS)).to eq(<<~YAML.chomp)
+        AllCops:
+          AllowedOffenses:
+            'example1.rb':
+              Checksum: c010d340c1322855f5b1ae4b899df80af43dc414
+              Style/FrozenStringLiteralComment: 1
+              Style/NumericLiterals: 1
+            'example2.rb':
+              Checksum: c62c47444ef5cf248a2049467c8ef2e3a0c58a92
+              Style/FrozenStringLiteralComment: 1
+              Style/NumericLiterals: 1
+
+        # Offense count: 1
+        # Cop supports --auto-correct.
+        # Configuration parameters: ConsistentQuotesInMultiline.
+        # SupportedStyles: single_quotes, double_quotes
+        Style/StringLiterals:
+          EnforcedStyle: double_quotes
+
+        # Offense count: 2
+        # Cop supports --auto-correct.
+        # Configuration parameters: AutoCorrect, AllowHeredoc, AllowURI, URISchemes, IgnoreCopDirectives, IgnoredPatterns.
+        # URISchemes: http, https
+        Layout/LineLength:
+          Max: 90
+      YAML
+
+      expect(cli.run([])).to eq(1)
+    end
+
+    it 'generates AllowedOffenses instead of Enabled, Max, and Exclude when ' \
+       '--auto-gen-allowed-offenses is used' do
+      create_file('example1.rb', ['#' * 80,
+                                  '#' * 80,
+                                  'puts 123456'])
+      create_file('example2.rb', <<~RUBY)
+        def function
+          puts 123456
+          puts 'a'
+          puts "a"
+        end
+      RUBY
+
+      expect(cli.run(['--auto-gen-config', '--auto-gen-allowed-offenses']))
+        .to eq(0)
+      expect($stderr.string).to eq('')
+      actual = IO.read('.rubocop_todo.yml').split($RS)
+
+      # AllowedOffenses is generated in most cases, but if a non-default style
+      # is used consistently, an EnforcedStyle parameter is generated instead.
+      expect(actual[7..-1].join($RS)).to eq(<<~YAML.chomp)
+        AllCops:
+          AllowedOffenses:
+            'example1.rb':
+              Checksum: f2d875fc91413bdc3880cd2e55e8e3ef21846873
+              Style/FrozenStringLiteralComment: 1
+              Style/NumericLiterals: 1
+            'example2.rb':
+              Checksum: 458a826e78de976371e9305306cc8720263a1b1a
+              Style/FrozenStringLiteralComment: 1
+              Style/NumericLiterals: 1
+      YAML
+
+      expect(cli.run([])).to eq(1)
+      expect($stderr.string).to eq('')
     end
 
     it 'includes --auto-gen-only-exclude in the command comment when given' do

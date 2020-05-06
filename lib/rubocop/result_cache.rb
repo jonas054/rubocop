@@ -84,7 +84,7 @@ module RuboCop
       @path = File.join(cache_root,
                         rubocop_checksum,
                         context_checksum(team, options),
-                        file_checksum(file, config_store))
+                        ResultCache.file_checksum(file, config_store))
       @cached_data = CachedData.new(file)
     end
 
@@ -141,22 +141,22 @@ module RuboCop
       false
     end
 
-    def file_checksum(file, config_store)
-      digester = Digest::SHA1.new
-      mode = File.stat(file).mode
-      digester.update(
-        "#{file}#{mode}#{config_store.for(file).signature}"
-      )
-      digester.file(file)
-      digester.hexdigest
-    rescue Errno::ENOENT
-      # Spurious files that come and go should not cause a crash, at least not
-      # here.
-      '_'
-    end
-
     class << self
       attr_accessor :source_checksum, :inhibit_cleanup
+
+      def file_checksum(file, config_store = nil)
+        digester = Digest::SHA1.new
+        mode = File.stat(file).mode
+        digester.update(
+          "#{file}#{mode}#{config_store&.for(file)&.signature}"
+        )
+        digester.file(file)
+        digester.hexdigest
+      rescue Errno::ENOENT
+        # Spurious files that come and go should not cause a crash, at least not
+        # here.
+        '_'
+      end
     end
 
     # The checksum of the rubocop program running the inspection.

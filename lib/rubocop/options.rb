@@ -122,6 +122,7 @@ module RuboCop
       end
 
       option(opts, '--auto-gen-only-exclude')
+      option(opts, '--auto-gen-allowed-offenses')
       option(opts, '--no-auto-gen-timestamp') do
         @options[:no_auto_gen_timestamp] = true
       end
@@ -305,7 +306,7 @@ module RuboCop
       message = '--%<flag>s can only be used together with --auto-gen-config.'
 
       %i[exclude_limit no_offense_counts no_auto_gen_timestamp
-         auto_gen_only_exclude].each do |option|
+         auto_gen_only_exclude auto_gen_allowed_offenses].each do |option|
         if @options.key?(option)
           raise OptionArgumentError,
                 format(message, flag: option.to_s.tr('_', '-'))
@@ -406,6 +407,9 @@ module RuboCop
                                          'when running --auto-gen-config, except if the',
                                          'number of files with offenses is bigger than',
                                          'exclude-limit.'],
+      auto_gen_allowed_offenses:        ['Generate an AllCops/AllowedOffenses parameter when',
+                                         'running --auto-gen-config and not Enabled, Max, or',
+                                         'Exclude.'],
       exclude_limit:                    ['Used together with --auto-gen-config to',
                                          'set the limit for how many Exclude',
                                          "properties to generate. Default is #{MAX_EXCL}."],

@@ -535,13 +535,45 @@ be a good idea to use `rubocop --auto-gen-config`, which creates
 `.rubocop_todo.yml` and adds `inherit_from: .rubocop_todo.yml` in your
 `.rubocop.yml`. The generated file `.rubocop_todo.yml` contains
 configuration to disable cops that currently detect an offense in the
-code by changing the configuration for the cop, excluding the offending
-files, or disabling the cop altogether once a file count limit has been
-reached.
+code by changing the configuration for the cop. Parameters that can be
+generated are:
+
+* `EnforcedStyle` - if a non-default but valid style is used consistently
+   in the code base, this parameter will be set to that style
+* `Exclude` - a list of files containing offenses
+* `Max` - a value that's high enough to disable offense reports
+* `AllowedOffenses` - a limit for how many offenses are allowed for a cop
+* `Enabled` - set to `false` to disable the cop altogether
+
+### The `Exclude` parameter
 
 By adding the option `--exclude-limit COUNT`, e.g., `rubocop
 --auto-gen-config --exclude-limit 5`, you can change how many files are
 excluded before the cop is entirely disabled. The default COUNT is 15.
+
+### The `Max` parameter
+
+The cops in the `Metrics` department will by default get `Max` parameters
+generated in `.rubocop_todo.yml`. The value of these will be just high enough
+so that no offenses are reported the next time you run `rubocop`. If you
+prefer to exclude files, like for other cops, add `--auto-gen-only-exclude`
+when running with `--auto-gen-config`. It will still change the maximum if the
+number of excluded files is higher than the exclude limit.
+
+### The `AllowedOffenses` parameter
+
+When running `rubocop --auto-gen-config --auto-gen-allowed-offenses` you get
+a todo file with an `AllCops: AllowedOffenses` containing file names and
+offenses that were detected. No other parameters, except `EnforcedStyle` and
+`Layout/LineLength: Max` are generated in this mode.
+
+This is a different way of working with a large number of offenses that
+you want to fix in increments without allowing new offenses to be added to
+the code base. For each file, a `Checksum` parameter is generated. If the
+file is later edited, its checksum will no longer match the stored
+`Checksum`, so the allowed offenses will no longer be allowed.
+
+### Working with the TODO list
 
 The next step is to cut and paste configuration from `.rubocop_todo.yml`
 into `.rubocop.yml` for everything that you think is in line with your
@@ -554,16 +586,11 @@ Then you can start removing the entries in the generated
 `.rubocop_todo.yml` file one by one as you work through all the offenses
 in the code.
 
+### Alternatives
+
 Another way of silencing offense reports, aside from configuration, is
 through source code comments. These can be added manually or
 automatically. See "Disabling Cops within Source Code" below.
-
-The cops in the `Metrics` department will by default get `Max` parameters
-generated in `.rubocop_todo.yml`. The value of these will be just high enough
-so that no offenses are reported the next time you run `rubocop`. If you
-prefer to exclude files, like for other cops, add `--auto-gen-only-exclude`
-when running with `--auto-gen-config`. It will still change the maximum if the
-number of excluded files is higher than the exclude limit.
 
 ## Updating the configuration file
 

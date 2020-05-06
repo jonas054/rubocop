@@ -36,6 +36,7 @@ module RuboCop
 
       def initialize(options = {})
         @options = options # CLI options
+        @hidden_offenses = {}
       end
 
       def file_started(file, options)
@@ -45,8 +46,10 @@ module RuboCop
       end
 
       def file_finished(file, offenses)
-        each { |f| f.file_finished(file, offenses) }
-        offenses
+        offenses_to_report = without_allowed(offenses,
+                                             PathUtil.smart_path(file))
+        each { |f| f.file_finished(file, offenses_to_report) }
+        offenses_to_report
       end
 
       def add_formatter(formatter_type, output_path = nil)
@@ -68,6 +71,38 @@ module RuboCop
       end
 
       private
+
+      def without_allowed(offenses, path)
+        config = @config_store.for(path)
+        allowed = config.for_cop('AllCops')['AllowedOffenses']
+        return offenses unless allowed
+
+        config_dir = File.dirname(config.loaded_path)
+        path = PathUtil.relative_path(path, config_dir)
+        allowed_for_file = allowed[path]
+        return offenses unless allowed_for_file
+
+        offenses.reject do |offense|
+          new_checksum =
+            Dir.chdir(config_dir) { ResultCache.file_checksum(path) }
+          next false if allowed_for_file['Checksum'] != new_checksum
+
+          should_be_hidden?(offense, path, allowed_for_file)
+        end
+      end
+
+      def should_be_hidden?(offense, path, allowed_for_file)
+        cop_name = offense.cop_name
+        return false unless allowed_for_file[cop_name]
+
+        @hidden_offenses[path] ||= Hash.new(0)
+        if @hidden_offenses[path][cop_name] >= allowed_for_file[cop_name]
+          return false
+        end
+
+        @hidden_offenses[path][cop_name] += 1
+        true
+      end
 
       def formatter_class(formatter_type)
         case formatter_type

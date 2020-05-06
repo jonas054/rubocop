@@ -39,7 +39,7 @@ module RuboCop
         offenses.each do |o|
           @cops_with_offenses[o.cop_name] += 1
           @files_with_offenses[o.cop_name] ||= Set.new
-          @files_with_offenses[o.cop_name] << file
+          @files_with_offenses[o.cop_name] << [file, offenses]
         end
       end
 
@@ -48,6 +48,11 @@ module RuboCop
 
         # Syntax isn't a real cop and it can't be disabled.
         @cops_with_offenses.delete('Lint/Syntax')
+
+        if @options[:auto_gen_allowed_offenses] &&
+           @cops_with_offenses.keys != ['Layout/LineLength']
+          output_allowed_offenses
+        end
 
         output_offenses
 
@@ -59,22 +64,19 @@ module RuboCop
       def command
         command = 'rubocop --auto-gen-config'
 
-        if @options[:auto_gen_only_exclude]
-          command += ' --auto-gen-only-exclude'
-        end
+        command += add_option(:auto_gen_only_exclude)
+        command += add_option(:auto_gen_allowed_offenses)
 
         if @exclude_limit_option
-          command +=
-            format(' --exclude-limit %<limit>d',
-                   limit: Integer(@exclude_limit_option))
+          command += format(' --exclude-limit %<limit>d',
+                            limit: Integer(@exclude_limit_option))
         end
-        command += ' --no-offense-counts' if @options[:no_offense_counts]
+        command += add_option(:no_offense_counts)
+        command + add_option(:no_auto_gen_timestamp)
+      end
 
-        if @options[:no_auto_gen_timestamp]
-          command += ' --no-auto-gen-timestamp'
-        end
-
-        command
+      def add_option(key)
+        @options[key] ? " --#{key.to_s.tr('_', '-')}" : ''
       end
 
       def timestamp
@@ -87,18 +89,59 @@ module RuboCop
         end
       end
 
+      def output_allowed_offenses
+        files_and_offenses = @files_with_offenses.values.inject(:+) || []
+        if files_and_offenses.any?
+          output.puts 'AllCops:'
+          output.puts '  AllowedOffenses:'
+        end
+
+        files_and_offenses.each do |file, offenses|
+          next if offenses.nil? || offenses.empty?
+
+          output_allowed_offenses_for(PathUtil.smart_path(file), offenses)
+        end
+      end
+
+      def output_allowed_offenses_for(relative_path, offenses)
+        checksum = ResultCache.file_checksum(relative_path)
+        output.puts "    '#{relative_path}':\n" \
+                    "      Checksum: #{checksum}"
+        offenses.group_by(&:cop_name).each do |cop_name, cop_offenses|
+          cfg = self.class.config_to_allow_offenses[cop_name] || {}
+          unless cfg.keys.any? { |key| key.is_a?(String) }
+            output.puts "      #{cop_name}: #{cop_offenses.size}"
+          end
+        end
+      end
+
       def output_cop(cop_name, offense_count)
-        output.puts
         cfg = self.class.config_to_allow_offenses[cop_name] || {}
         set_max(cfg, cop_name)
+
+        keys_to_output = keys_to_output(cfg, cop_name)
+        return if keys_to_output.empty? && @options[:auto_gen_allowed_offenses]
 
         # To avoid malformed YAML when potentially reading the config in
         # #excludes, we use an output buffer and append it to the actual output
         # only when it results in valid YAML.
         output_buffer = StringIO.new
         output_cop_comments(output_buffer, cfg, cop_name, offense_count)
-        output_cop_config(output_buffer, cfg, cop_name)
-        output.puts(output_buffer.string)
+        output_cop_config(output_buffer, cfg, keys_to_output, cop_name)
+        output.puts("\n" + output_buffer.string)
+      end
+
+      def keys_to_output(cfg, cop_name)
+        # 'Enabled' option will be put into file only if exclude
+        # limit is exceeded.
+        keys = cfg.keys - ['Enabled']
+
+        if @options[:auto_gen_allowed_offenses] &&
+           cop_name != 'Layout/LineLength'
+          keys -= %w[Max MinDigits]
+        end
+
+        keys
       end
 
       def set_max(cfg, cop_name)
@@ -160,23 +203,25 @@ module RuboCop
         RuboCop::ConfigLoader.default_configuration[cop_name]
       end
 
-      def output_cop_config(output_buffer, cfg, cop_name)
-        # 'Enabled' option will be put into file only if exclude
-        # limit is exceeded.
-        cfg_without_enabled = cfg.reject { |key| key == 'Enabled' }
-
+      def output_cop_config(output_buffer, cfg, keys_to_output, cop_name)
         output_buffer.puts "#{cop_name}:"
-        cfg_without_enabled.each do |key, value|
+        output_cop_parameters(cfg, keys_to_output, output_buffer)
+
+        return if @options[:auto_gen_allowed_offenses] ||
+                  (cfg.keys & keys_to_output).any?
+
+        output_offending_files(output_buffer, cop_name)
+      end
+
+      def output_cop_parameters(cfg, keys_to_output, output_buffer)
+        keys_to_output.each do |key|
+          value = cfg[key]
           value = value[0] if value.is_a?(Array)
           output_buffer.puts "  #{key}: #{value}"
         end
-
-        output_offending_files(output_buffer, cfg_without_enabled, cop_name)
       end
 
-      def output_offending_files(output_buffer, cfg, cop_name)
-        return unless cfg.empty?
-
+      def output_offending_files(output_buffer, cop_name)
         offending_files = @files_with_offenses[cop_name].sort
         if offending_files.count > @exclude_limit
           output_buffer.puts '  Enabled: false'
@@ -204,7 +249,7 @@ module RuboCop
         config = ConfigStore.new.for(parent)
         cfg = config[cop_name] || {}
 
-        ((cfg['Exclude'] || []) + offending_files).uniq
+        ((cfg['Exclude'] || []) + offending_files.map(&:first)).uniq
       end
 
       def output_exclude_path(output_buffer, exclude_path, parent)

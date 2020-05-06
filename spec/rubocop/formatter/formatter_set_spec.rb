@@ -1,7 +1,17 @@
 # frozen_string_literal: true
 
 RSpec.describe RuboCop::Formatter::FormatterSet do
-  subject(:formatter_set) { described_class.new }
+  subject(:formatter_set) { described_class.new(options) }
+
+  let(:cop_config) { {} }
+  let(:config) do
+    instance_double(RuboCop::Config,
+                    for_cop: cop_config,
+                    loaded_path: '.rubocop.yml')
+  end
+  let(:config_store) { instance_double(RuboCop::ConfigStore, for: config) }
+  let(:options) { { config_store: config_store, cli_options: {} } }
+  let(:files) { ['path/to/file1', 'path/to/file2'] }
 
   it 'responds to all formatter API methods' do
     %i[started file_started file_finished finished].each do |method|
@@ -10,14 +20,105 @@ RSpec.describe RuboCop::Formatter::FormatterSet do
   end
 
   describe 'formatter API method' do
-    let(:files) { ['/path/to/file1', '/path/to/file2'] }
-
     it 'invokes the same method of all containing formatters' do
       formatter_set.add_formatter('simple')
       formatter_set.add_formatter('emacs')
       expect(formatter_set[0]).to receive(:started).with(files)
       expect(formatter_set[1]).to receive(:started).with(files)
       formatter_set.started(files)
+    end
+  end
+
+  describe 'file_finished' do
+    let(:location1) do
+      instance_double(Parser::Source::Range,
+                      begin_pos: 0,
+                      size: 4,
+                      first_line: 1,
+                      last_line: 1,
+                      source_line: 'some code')
+    end
+    let(:location2) do
+      instance_double(Parser::Source::Range,
+                      begin_pos: 0,
+                      size: 4,
+                      first_line: 1,
+                      last_line: 1,
+                      source_line: 'some code')
+    end
+    let(:offense1) do
+      instance_double(RuboCop::Cop::Offense,
+                      cop_name: 'Dept/SomeCop',
+                      message: 'Offense detected',
+                      corrected?: false,
+                      corrected_with_todo?: false,
+                      severity: RuboCop::Cop::Severity.new(:convention),
+                      location: location1,
+                      highlighted_area: location1,
+                      line: 1,
+                      real_column: 1)
+    end
+    let(:offense2) do
+      instance_double(RuboCop::Cop::Offense,
+                      cop_name: 'Dept/SomeCop',
+                      message: 'Offense detected',
+                      corrected?: false,
+                      corrected_with_todo?: false,
+                      severity: RuboCop::Cop::Severity.new(:convention),
+                      location: location2,
+                      highlighted_area: location2,
+                      line: 2,
+                      real_column: 1)
+    end
+
+    before do
+      formatter_set.add_formatter('clang')
+      formatter_set.add_formatter('simple')
+      formatter_set.started(files)
+      formatter_set.file_started(files.first, options)
+      formatter_set.file_started(files.last, options)
+    end
+
+    around do |example|
+      begin
+        $stdout = StringIO.new
+        example.run
+      ensure
+        $stdout = STDOUT
+      end
+    end
+
+    it 'returns the same offenses as the given ones' do
+      expect(formatter_set.file_finished(files.first, [offense1]))
+        .to eq([offense1])
+      expect(formatter_set.file_finished(files.last, [offense2]))
+        .to eq([offense2])
+    end
+
+    context 'when AllowedOffenses is used in configuration' do
+      let(:cop_config) do
+        {
+          'AllowedOffenses' => {
+            'path/to/file1' => {
+              'Checksum' => '_', # Since the file doesn't really exist
+              'Dept/SomeCop' => 1
+            }
+          }
+        }
+      end
+
+      it 'outputs and returns the given offenses minus the allowed ones' do
+        expect(formatter_set.file_finished(files.first, [offense1])).to eq([])
+        expect(formatter_set.file_finished(files.last, [offense2]))
+          .to eq([offense2])
+        expect($stdout.string).to eq(<<~OUTPUT)
+          path/to/file2:2:1: C: Offense detected
+          some code
+          ^^^^
+          == path/to/file2 ==
+          C:  2:  1: Offense detected
+        OUTPUT
+      end
     end
   end
 
