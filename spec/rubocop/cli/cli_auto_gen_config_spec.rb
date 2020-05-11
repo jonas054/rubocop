@@ -1018,11 +1018,9 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
         AllCops:
           AllowedOffenses:
             'example1.rb':
-              Checksum: c010d340c1322855f5b1ae4b899df80af43dc414
               Style/FrozenStringLiteralComment: 1
               Style/NumericLiterals: 1
             'example2.rb':
-              Checksum: c62c47444ef5cf248a2049467c8ef2e3a0c58a92
               Style/FrozenStringLiteralComment: 1
               Style/NumericLiterals: 1
 
@@ -1068,11 +1066,9 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
         AllCops:
           AllowedOffenses:
             'example1.rb':
-              Checksum: f2d875fc91413bdc3880cd2e55e8e3ef21846873
               Style/FrozenStringLiteralComment: 1
               Style/NumericLiterals: 1
             'example2.rb':
-              Checksum: 458a826e78de976371e9305306cc8720263a1b1a
               Style/FrozenStringLiteralComment: 1
               Style/NumericLiterals: 1
       YAML

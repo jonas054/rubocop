@@ -83,10 +83,6 @@ module RuboCop
         return offenses unless allowed_for_file
 
         offenses.reject do |offense|
-          new_checksum =
-            Dir.chdir(config_dir) { ResultCache.file_checksum(path) }
-          next false if allowed_for_file['Checksum'] != new_checksum
-
           should_be_hidden?(offense, path, allowed_for_file)
         end
       end

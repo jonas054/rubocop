@@ -104,9 +104,7 @@ module RuboCop
       end
 
       def output_allowed_offenses_for(relative_path, offenses)
-        checksum = ResultCache.file_checksum(relative_path)
-        output.puts "    '#{relative_path}':\n" \
-                    "      Checksum: #{checksum}"
+        output.puts "    '#{relative_path}':"
         offenses.group_by(&:cop_name).each do |cop_name, cop_offenses|
           cfg = self.class.config_to_allow_offenses[cop_name] || {}
           unless cfg.keys.any? { |key| key.is_a?(String) }

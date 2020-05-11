@@ -569,9 +569,7 @@ offenses that were detected. No other parameters, except `EnforcedStyle` and
 
 This is a different way of working with a large number of offenses that
 you want to fix in increments without allowing new offenses to be added to
-the code base. For each file, a `Checksum` parameter is generated. If the
-file is later edited, its checksum will no longer match the stored
-`Checksum`, so the allowed offenses will no longer be allowed.
+the code base.
 
 ### Working with the TODO list
 
