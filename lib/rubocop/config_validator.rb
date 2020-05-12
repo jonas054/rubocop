@@ -9,7 +9,7 @@ module RuboCop
     extend Forwardable
 
     COMMON_PARAMS = %w[Exclude Include Severity inherit_mode
-                       AutoCorrect StyleGuide Details].freeze
+                       AutoCorrect StyleGuide Details AllowedOffenses].freeze
     INTERNAL_PARAMS = %w[Description StyleGuide
                          VersionAdded VersionChanged VersionRemoved
                          Reference Safe SafeAutoCorrect].freeze

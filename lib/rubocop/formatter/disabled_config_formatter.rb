@@ -49,11 +49,6 @@ module RuboCop
         # Syntax isn't a real cop and it can't be disabled.
         @cops_with_offenses.delete('Lint/Syntax')
 
-        if @options[:auto_gen_allowed_offenses] &&
-           @cops_with_offenses.keys != ['Layout/LineLength']
-          output_allowed_offenses
-        end
-
         output_offenses
 
         puts "Created #{output.path}."
@@ -89,36 +84,11 @@ module RuboCop
         end
       end
 
-      def output_allowed_offenses
-        files_and_offenses = @files_with_offenses.values.inject(:+) || []
-        if files_and_offenses.any?
-          output.puts 'AllCops:'
-          output.puts '  AllowedOffenses:'
-        end
-
-        files_and_offenses.each do |file, offenses|
-          next if offenses.nil? || offenses.empty?
-
-          output_allowed_offenses_for(PathUtil.smart_path(file), offenses)
-        end
-      end
-
-      def output_allowed_offenses_for(relative_path, offenses)
-        output.puts "    '#{relative_path}':"
-        offenses.group_by(&:cop_name).each do |cop_name, cop_offenses|
-          cfg = self.class.config_to_allow_offenses[cop_name] || {}
-          unless cfg.keys.any? { |key| key.is_a?(String) }
-            output.puts "      #{cop_name}: #{cop_offenses.size}"
-          end
-        end
-      end
-
       def output_cop(cop_name, offense_count)
         cfg = self.class.config_to_allow_offenses[cop_name] || {}
         set_max(cfg, cop_name)
 
         keys_to_output = keys_to_output(cfg, cop_name)
-        return if keys_to_output.empty? && @options[:auto_gen_allowed_offenses]
 
         # To avoid malformed YAML when potentially reading the config in
         # #excludes, we use an output buffer and append it to the actual output
@@ -127,19 +97,6 @@ module RuboCop
         output_cop_comments(output_buffer, cfg, cop_name, offense_count)
         output_cop_config(output_buffer, cfg, keys_to_output, cop_name)
         output.puts("\n" + output_buffer.string)
-      end
-
-      def keys_to_output(cfg, cop_name)
-        # 'Enabled' option will be put into file only if exclude
-        # limit is exceeded.
-        keys = cfg.keys - ['Enabled']
-
-        if @options[:auto_gen_allowed_offenses] &&
-           cop_name != 'Layout/LineLength'
-          keys -= %w[Max MinDigits]
-        end
-
-        keys
       end
 
       def set_max(cfg, cop_name)
@@ -205,10 +162,13 @@ module RuboCop
         output_buffer.puts "#{cop_name}:"
         output_cop_parameters(cfg, keys_to_output, output_buffer)
 
-        return if @options[:auto_gen_allowed_offenses] ||
-                  (cfg.keys & keys_to_output).any?
+        return if keys_to_output.any?
 
-        output_offending_files(output_buffer, cop_name)
+        if @options[:auto_gen_allowed_offenses]
+          output_allowed_offenses(cop_name, output_buffer)
+        else
+          output_offending_files(output_buffer, cop_name)
+        end
       end
 
       def output_cop_parameters(cfg, keys_to_output, output_buffer)
@@ -217,6 +177,42 @@ module RuboCop
           value = value[0] if value.is_a?(Array)
           output_buffer.puts "  #{key}: #{value}"
         end
+      end
+
+      def output_allowed_offenses(cop_name, output_buffer)
+        files_and_offenses = @files_with_offenses[cop_name]
+
+        return if files_and_offenses.empty?
+
+        output_buffer.puts '  AllowedOffenses:'
+        files_and_offenses.each do |file, offenses|
+          next if offenses.nil? || offenses.empty?
+
+          output_allowed_offenses_for(cop_name, PathUtil.smart_path(file),
+                                      offenses, output_buffer)
+        end
+      end
+
+      def output_allowed_offenses_for(cop_name, relative_path, offenses,
+                                      output_buffer)
+        cop_offenses = offenses.select { |o| o.cop_name == cop_name }
+        cfg = self.class.config_to_allow_offenses[cop_name] || {}
+        return if keys_to_output(cfg, cop_name).any? { |key| key.is_a?(String) }
+
+        output_buffer.puts "    '#{relative_path}': #{cop_offenses.size}"
+      end
+
+      def keys_to_output(cfg, cop_name)
+        # 'Enabled' option will be put into file only if exclude
+        # limit is exceeded.
+        keys = cfg.keys - ['Enabled']
+
+        if @options[:auto_gen_allowed_offenses] &&
+           cop_name != 'Layout/LineLength'
+          keys -= %w[Max MinDigits]
+        end
+
+        keys
       end
 
       def output_offending_files(output_buffer, cop_name)

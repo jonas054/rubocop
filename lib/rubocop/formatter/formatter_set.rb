@@ -74,27 +74,23 @@ module RuboCop
 
       def without_allowed(offenses, path)
         config = @config_store.for(path)
-        allowed = config.for_cop('AllCops')['AllowedOffenses']
-        return offenses unless allowed
 
         config_dir = File.dirname(config.loaded_path)
         path = PathUtil.relative_path(path, config_dir)
-        allowed_for_file = allowed[path]
-        return offenses unless allowed_for_file
 
         offenses.reject do |offense|
-          should_be_hidden?(offense, path, allowed_for_file)
+          should_be_hidden?(offense, path, config)
         end
       end
 
-      def should_be_hidden?(offense, path, allowed_for_file)
+      def should_be_hidden?(offense, path, config)
         cop_name = offense.cop_name
-        return false unless allowed_for_file[cop_name]
+        allowed_for_file = config.for_cop(cop_name).dig('AllowedOffenses', path)
+
+        return false unless allowed_for_file
 
         @hidden_offenses[path] ||= Hash.new(0)
-        if @hidden_offenses[path][cop_name] >= allowed_for_file[cop_name]
-          return false
-        end
+        return false if @hidden_offenses[path][cop_name] >= allowed_for_file
 
         @hidden_offenses[path][cop_name] += 1
         true

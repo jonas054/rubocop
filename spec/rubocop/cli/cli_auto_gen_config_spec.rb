@@ -1014,15 +1014,23 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
 
       # AllowedOffenses is generated in most cases, but if a non-default style
       # is used consistently, an EnforcedStyle parameter is generated instead.
-      expect(actual[7..-1].join($RS)).to eq(<<~YAML.chomp)
-        AllCops:
+      expect(actual[8..-1].join($RS)).to eq(<<~YAML.chomp)
+        # Offense count: 2
+        # Cop supports --auto-correct.
+        # Configuration parameters: EnforcedStyle.
+        # SupportedStyles: always, always_true, never
+        Style/FrozenStringLiteralComment:
           AllowedOffenses:
-            'example1.rb':
-              Style/FrozenStringLiteralComment: 1
-              Style/NumericLiterals: 1
-            'example2.rb':
-              Style/FrozenStringLiteralComment: 1
-              Style/NumericLiterals: 1
+            'example1.rb': 1
+            'example2.rb': 1
+
+        # Offense count: 2
+        # Cop supports --auto-correct.
+        # Configuration parameters: Strict.
+        Style/NumericLiterals:
+          AllowedOffenses:
+            'example1.rb': 1
+            'example2.rb': 1
 
         # Offense count: 1
         # Cop supports --auto-correct.
@@ -1039,7 +1047,25 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
           Max: 90
       YAML
 
-      expect(cli.run([])).to eq(1)
+      # The offenses were there but they were allowed and thus not counted as
+      # detected. But the exit code is still 1.
+      expect { expect(cli.run([])).to eq(1) }.to output(<<~OUTPUT).to_stdout
+        Inspecting 2 files
+        ..
+
+        2 files inspected, no offenses detected
+      OUTPUT
+
+      # The offenses were there but they were allowed and thus not counted as
+      # detected. But the exit code is still 1.
+      expect do
+        expect(cli.run(['--fail-fast'])).to eq(1)
+      end.to output(<<~OUTPUT).to_stdout
+        Inspecting 2 files
+        .
+
+        1 file inspected, no offenses detected
+      OUTPUT
     end
 
     it 'generates AllowedOffenses instead of Enabled, Max, and Exclude when ' \
@@ -1062,15 +1088,31 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
 
       # AllowedOffenses is generated in most cases, but if a non-default style
       # is used consistently, an EnforcedStyle parameter is generated instead.
-      expect(actual[7..-1].join($RS)).to eq(<<~YAML.chomp)
-        AllCops:
+      expect(actual[8..-1].join($RS)).to eq(<<~YAML.chomp)
+        # Offense count: 2
+        # Cop supports --auto-correct.
+        # Configuration parameters: EnforcedStyle.
+        # SupportedStyles: always, always_true, never
+        Style/FrozenStringLiteralComment:
           AllowedOffenses:
-            'example1.rb':
-              Style/FrozenStringLiteralComment: 1
-              Style/NumericLiterals: 1
-            'example2.rb':
-              Style/FrozenStringLiteralComment: 1
-              Style/NumericLiterals: 1
+            'example1.rb': 1
+            'example2.rb': 1
+
+        # Offense count: 2
+        # Cop supports --auto-correct.
+        # Configuration parameters: Strict.
+        Style/NumericLiterals:
+          AllowedOffenses:
+            'example1.rb': 1
+            'example2.rb': 1
+
+        # Offense count: 1
+        # Cop supports --auto-correct.
+        # Configuration parameters: EnforcedStyle, ConsistentQuotesInMultiline.
+        # SupportedStyles: single_quotes, double_quotes
+        Style/StringLiterals:
+          AllowedOffenses:
+            'example2.rb': 1
       YAML
 
       expect(cli.run([])).to eq(1)

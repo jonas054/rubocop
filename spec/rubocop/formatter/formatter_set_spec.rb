@@ -98,12 +98,7 @@ RSpec.describe RuboCop::Formatter::FormatterSet do
     context 'when AllowedOffenses is used in configuration' do
       let(:cop_config) do
         {
-          'AllowedOffenses' => {
-            'path/to/file1' => {
-              'Checksum' => '_', # Since the file doesn't really exist
-              'Dept/SomeCop' => 1
-            }
-          }
+          'AllowedOffenses' => { 'path/to/file1' => 1 }
         }
       end
 
