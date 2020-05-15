@@ -37,6 +37,7 @@ module RuboCop
       else
         warm_cache(target_files) if @options[:parallel]
         inspect_files(target_files)
+        formatter_set.reported_offenses.none? { |o| considered_failure?(o) }
       end
     rescue Interrupt
       self.aborting = true
@@ -83,17 +84,12 @@ module RuboCop
     end
 
     def each_inspected_file(files)
-      files.reduce(true) do |all_passed, file|
+      files.each do |file|
         offenses = process_file(file)
         yield file
-
-        if offenses.any? { |o| considered_failure?(o) }
-          break false if @options[:fail_fast]
-
-          next false
+        if @options[:fail_fast] && offenses.any? { |o| considered_failure?(o) }
+          break
         end
-
-        all_passed
       end
     end
 

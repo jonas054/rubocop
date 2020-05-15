@@ -1047,19 +1047,15 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
           Max: 90
       YAML
 
-      # The offenses were there but they were allowed and thus not counted as
-      # detected. But the exit code is still 1.
-      expect { expect(cli.run([])).to eq(1) }.to output(<<~OUTPUT).to_stdout
+      expect { expect(cli.run([])).to eq(0) }.to output(<<~OUTPUT).to_stdout
         Inspecting 2 files
         ..
 
         2 files inspected, no offenses detected
       OUTPUT
 
-      # The offenses were there but they were allowed and thus not counted as
-      # detected. But the exit code is still 1.
       expect do
-        expect(cli.run(['--fail-fast'])).to eq(1)
+        expect(cli.run(['--fail-fast'])).to eq(0)
       end.to output(<<~OUTPUT).to_stdout
         Inspecting 2 files
         .
@@ -1115,7 +1111,7 @@ RSpec.describe RuboCop::CLI, :isolated_environment do
             'example2.rb': 1
       YAML
 
-      expect(cli.run([])).to eq(1)
+      expect(cli.run([])).to eq(0)
       expect($stderr.string).to eq('')
     end
 

@@ -34,9 +34,12 @@ module RuboCop
         end
       end
 
+      attr_reader :reported_offenses
+
       def initialize(options = {})
         @options = options # CLI options
         @hidden_offenses = {}
+        @reported_offenses = []
       end
 
       def file_started(file, options)
@@ -49,6 +52,7 @@ module RuboCop
         offenses_to_report = without_allowed(offenses,
                                              PathUtil.smart_path(file))
         each { |f| f.file_finished(file, offenses_to_report) }
+        @reported_offenses += offenses_to_report
         offenses_to_report
       end
 
